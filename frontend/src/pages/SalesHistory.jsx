@@ -91,6 +91,7 @@ export default function SalesHistory() {
   };
 
   const filteredSales = sales.filter(sale => {
+    // Search filter
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       const matchesSearch = 
@@ -99,11 +100,32 @@ export default function SalesHistory() {
         sale.items?.some(item => item.sku?.toLowerCase().includes(q));
       if (!matchesSearch) return false;
     }
+    
+    // Status filter
     if (statusFilter !== "all" && sale.status !== statusFilter) return false;
+    
+    // Payment method filter
     if (paymentFilter !== "all") {
       const hasPaymentMethod = sale.payments?.some(p => p.method === paymentFilter);
       if (!hasPaymentMethod) return false;
     }
+    
+    // Channel filter (Store vs Online from Shopify)
+    if (channelFilter !== "all") {
+      const saleChannel = sale.channel || "store";
+      if (saleChannel !== channelFilter) return false;
+    }
+    
+    // Date range filter
+    if (dateFrom) {
+      const saleDate = new Date(sale.created_at).toISOString().split('T')[0];
+      if (saleDate < dateFrom) return false;
+    }
+    if (dateTo) {
+      const saleDate = new Date(sale.created_at).toISOString().split('T')[0];
+      if (saleDate > dateTo) return false;
+    }
+    
     return true;
   });
 
