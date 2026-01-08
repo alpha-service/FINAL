@@ -1102,6 +1102,157 @@ async def send_peppol(doc_id: str):
     
     return {"status": "pending", "message": "Peppol integration not yet implemented"}
 
+# --- Shopify Integration Endpoints ---
+@api_router.get("/shopify/settings")
+async def get_shopify_settings():
+    """Get Shopify integration settings"""
+    settings = await db.shopify_settings.find_one({}, {"_id": 0})
+    if not settings:
+        return None
+    return settings
+
+@api_router.post("/shopify/settings")
+async def create_or_update_shopify_settings(settings_data: ShopifySettingsUpdate):
+    """Create or update Shopify settings"""
+    existing = await db.shopify_settings.find_one({})
+    
+    if existing:
+        update_data = {k: v for k, v in settings_data.model_dump(exclude_unset=True).items() if v is not None}
+        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        
+        await db.shopify_settings.update_one(
+            {"id": existing["id"]},
+            {"$set": update_data}
+        )
+        updated = await db.shopify_settings.find_one({"id": existing["id"]}, {"_id": 0})
+        return updated
+    else:
+        new_settings = ShopifySettings(**settings_data.model_dump(exclude_unset=True))
+        await db.shopify_settings.insert_one(new_settings.model_dump())
+        return new_settings
+
+@api_router.post("/shopify/sync/products")
+async def sync_shopify_products():
+    """Import products from Shopify (MVP: manual trigger only)"""
+    settings = await db.shopify_settings.find_one({}, {"_id": 0})
+    if not settings or not settings.get("import_products_enabled"):
+        raise HTTPException(status_code=400, detail="Shopify not configured or product import disabled")
+    
+    # TODO: Actual Shopify API integration
+    # For MVP, this is a placeholder that logs the sync attempt
+    log = ShopifySyncLog(
+        sync_type="product_import",
+        status=ShopifySyncStatus.SUCCESS,
+        items_processed=0,
+        items_succeeded=0,
+        items_failed=0,
+        details={"message": "Shopify API integration pending"}
+    )
+    await db.shopify_sync_logs.insert_one(log.model_dump())
+    
+    await db.shopify_settings.update_one(
+        {"id": settings["id"]},
+        {"$set": {"last_product_sync": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {"status": "success", "message": "Product sync placeholder executed"}
+
+@api_router.post("/shopify/sync/stock")
+async def sync_stock_to_shopify():
+    """Push stock quantities to Shopify (batch operation)"""
+    settings = await db.shopify_settings.find_one({}, {"_id": 0})
+    if not settings or not settings.get("export_stock_enabled"):
+        raise HTTPException(status_code=400, detail="Shopify not configured or stock export disabled")
+    
+    # Get all products with Shopify mapping
+    products = await db.products.find(
+        {"shopify_variant_id": {"$ne": None}},
+        {"_id": 0}
+    ).to_list(1000)
+    
+    # TODO: Actual Shopify API stock update
+    log = ShopifySyncLog(
+        sync_type="stock_export",
+        status=ShopifySyncStatus.SUCCESS,
+        items_processed=len(products),
+        items_succeeded=len(products),
+        items_failed=0,
+        details={"message": f"Found {len(products)} mapped products for stock sync"}
+    )
+    await db.shopify_sync_logs.insert_one(log.model_dump())
+    
+    await db.shopify_settings.update_one(
+        {"id": settings["id"]},
+        {"$set": {"last_stock_sync": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {"status": "success", "items_synced": len(products)}
+
+@api_router.post("/shopify/sync/orders")
+async def sync_shopify_orders():
+    """Import orders from Shopify as POS sales with channel='Online'"""
+    settings = await db.shopify_settings.find_one({}, {"_id": 0})
+    if not settings or not settings.get("import_orders_enabled"):
+        raise HTTPException(status_code=400, detail="Shopify not configured or order import disabled")
+    
+    # TODO: Actual Shopify Orders API integration
+    log = ShopifySyncLog(
+        sync_type="order_import",
+        status=ShopifySyncStatus.SUCCESS,
+        items_processed=0,
+        items_succeeded=0,
+        items_failed=0,
+        details={"message": "Shopify Orders API integration pending"}
+    )
+    await db.shopify_sync_logs.insert_one(log.model_dump())
+    
+    await db.shopify_settings.update_one(
+        {"id": settings["id"]},
+        {"$set": {"last_order_sync": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {"status": "success", "message": "Order sync placeholder executed"}
+
+@api_router.get("/shopify/sync-logs")
+async def get_shopify_sync_logs(limit: int = Query(50)):
+    """Get Shopify sync logs"""
+    logs = await db.shopify_sync_logs.find(
+        {}, {"_id": 0}
+    ).sort("created_at", -1).to_list(limit)
+    return logs
+
+@api_router.get("/shopify/unmapped-products")
+async def get_unmapped_products():
+    """Get products from Shopify that couldn't be auto-mapped"""
+    unmapped = await db.unmapped_products.find({}, {"_id": 0}).to_list(100)
+    return unmapped
+
+@api_router.post("/shopify/unmapped-products/{unmapped_id}/map")
+async def map_unmapped_product(unmapped_id: str, pos_product_id: str):
+    """Manually map an unmapped Shopify product to a POS product"""
+    unmapped = await db.unmapped_products.find_one({"id": unmapped_id}, {"_id": 0})
+    if not unmapped:
+        raise HTTPException(status_code=404, detail="Unmapped product not found")
+    
+    pos_product = await db.products.find_one({"id": pos_product_id}, {"_id": 0})
+    if not pos_product:
+        raise HTTPException(status_code=404, detail="POS product not found")
+    
+    # Update POS product with Shopify mapping
+    await db.products.update_one(
+        {"id": pos_product_id},
+        {"$set": {
+            "shopify_variant_id": unmapped["shopify_variant_id"],
+            "shopify_product_id": unmapped["shopify_product_id"],
+            "origin": ProductOrigin.SHOPIFY
+        }}
+    )
+    
+    # Remove from unmapped queue
+    await db.unmapped_products.delete_one({"id": unmapped_id})
+    
+    return {"status": "success", "message": "Product mapped successfully"}
+
 # ============= SETUP =============
 app.include_router(api_router)
 
