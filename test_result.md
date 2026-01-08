@@ -285,6 +285,18 @@ frontend:
           agent: "testing"
           comment: "✅ PASSED: All document tabs working correctly (Tous, Devis, Factures, Tickets, Crédits). Document rows show proper Type badge, Number, Date, Client, Total, Status. Convert to Invoice action buttons (arrow icons) found and functional."
 
+  - task: "Document PDF Download and Navigation"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/DocumentsHub.jsx, /app/frontend/src/pages/DocumentDetail.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED: All document PDF download and navigation functionality working perfectly. 1) Eye icon (👁️) navigation from Documents Hub to Document Detail works correctly - navigates to /documents/{id} and loads complete document detail page. 2) Document Detail page displays all required sections: document number with status badge, customer info section, items table with columns (SKU, Description, Qté, Prix unit., TVA, Total), totals section (Sous-total, TVA, TOTAL), and action buttons (Imprimer, Dupliquer, Convertir, Encaisser). 3) PDF download from Documents Hub (⬇️ Download icon) triggers browser download successfully. 4) PDF download from Document Detail (Imprimer button) generates valid PDF files (verified 2222 bytes PDF format). 5) Documents Hub displays 6 documents in proper table format with Eye and Download icons in Actions column. All navigation flows and PDF generation endpoints are functional."
+
 metadata:
   created_by: "testing_agent"
   version: "1.0"
