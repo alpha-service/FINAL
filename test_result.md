@@ -272,13 +272,15 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Navigation Menu Visibility"
-    - "Root URL Redirect"
-    - "Navigation Links Functionality"
-    - "Page Content Loading"
-    - "Active Navigation Highlighting"
+    - "Devis Button in POS Cart"
+    - "Devis Creation from POS"
+    - "Sales History Enhanced Filters"
+    - "Sales History Canal Column"
+    - "Document Detail Page Enhancement"
+    - "Quote to Invoice Conversion"
+    - "Documents Hub Tabs"
   stuck_tasks: []
-  test_all: true
+  test_all: false
   test_priority: "high_first"
 
 agent_communication:
@@ -286,3 +288,5 @@ agent_communication:
       message: "Starting comprehensive navigation testing for POS system. Will test sidebar visibility, URL redirects, navigation functionality, and page loading across all routes."
     - agent: "testing"
       message: "✅ NAVIGATION TESTING COMPLETED SUCCESSFULLY: All navigation functionality is working perfectly. Root URL redirects correctly, sidebar is visible on all pages, all navigation links work, pages load with proper content and headers, and active navigation highlighting is functional. The POS system navigation meets all requirements specified in the test scenario."
+    - agent: "testing"
+      message: "Starting Phase 2-B testing: Devis workflow and Sales History enhancements. Will test quote creation from POS, enhanced sales filters, document detail improvements, and documents hub functionality."
