@@ -182,87 +182,108 @@ frontend:
 
   - task: "Devis Button in POS Cart"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/frontend/src/pages/POSScreen.jsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: "NA"
           agent: "testing"
           comment: "Need to test new 'Devis' button in POS cart between 'Annuler' and 'Payer' buttons"
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED: Devis button found in POS cart with correct positioning between Annuler and Payer buttons. Button has data-testid='save-devis-btn' and proper FileText icon."
 
   - task: "Devis Creation from POS"
     implemented: true
-    working: "NA"
+    working: false
     file: "/app/frontend/src/pages/POSScreen.jsx"
-    stuck_count: 0
+    stuck_count: 1
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: "NA"
           agent: "testing"
           comment: "Need to test quote creation functionality - should create quote with 'DV' prefix and navigate to document detail"
+        - working: false
+          agent: "testing"
+          comment: "❌ ISSUE: Quote creation works and navigates to document detail, but document number shows 'ALPHA&CO' instead of expected 'DV' prefix. However, in Documents Hub the quote shows correct number 'DV260108-001'. This appears to be a display issue in document detail page header."
 
   - task: "Sales History Enhanced Filters"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/frontend/src/pages/SalesHistory.jsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: "NA"
           agent: "testing"
           comment: "Need to test two-row filter layout with date range and channel filters"
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED: Sales History has correct two-row filter layout. Row 1: Search box, Status dropdown, Payment dropdown. Row 2: Date début, Date fin, Canal dropdown, Filter button. All filters functional."
 
   - task: "Sales History Canal Column"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/frontend/src/pages/SalesHistory.jsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: "NA"
           agent: "testing"
           comment: "Need to verify Canal column shows 🏪 Magasin or 🌐 En ligne icons"
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED: Canal column found in sales table with proper 🏪 Magasin icons displayed. Column header and content working correctly."
 
   - task: "Document Detail Page Enhancement"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/frontend/src/pages/DocumentDetail.jsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: "NA"
           agent: "testing"
           comment: "Need to test enhanced document detail with customer info, items table, and action buttons"
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED: Document detail page shows complete items table with columns: SKU, Description, Qté, Prix unit., TVA, Total. All action buttons present: Imprimer, Dupliquer, Convertir, Encaisser. Layout and functionality working correctly."
 
   - task: "Quote to Invoice Conversion"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/frontend/src/pages/DocumentDetail.jsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: "NA"
           agent: "testing"
           comment: "Need to test 'Convertir' button functionality for quotes"
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED: Convertir button visible for quotes and functional. Successfully converts quote to invoice, creates new document with different number, and navigates to converted document."
 
   - task: "Documents Hub Tabs"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/frontend/src/pages/DocumentsHub.jsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: "NA"
           agent: "testing"
           comment: "Need to test tabs: Tous, Devis, Factures, Tickets, Crédits and convert actions"
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED: All document tabs working correctly (Tous, Devis, Factures, Tickets, Crédits). Document rows show proper Type badge, Number, Date, Client, Total, Status. Convert to Invoice action buttons (arrow icons) found and functional."
 
 metadata:
   created_by: "testing_agent"
