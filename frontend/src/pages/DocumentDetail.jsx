@@ -1,0 +1,415 @@
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import axios from "axios";
+import { toast } from "sonner";
+import {
+  ArrowLeft,
+  Printer,
+  Download,
+  CreditCard,
+  RotateCcw,
+  Copy,
+  ArrowRight,
+  FileText,
+  User,
+  Calendar,
+  MapPin,
+  Receipt,
+  CheckCircle
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { generateReceiptPDF } from "@/utils/pdfGenerator";
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+const DOC_TYPE_LABELS = {
+  quote: "Devis / Offerte",
+  invoice: "Facture / Factuur",
+  receipt: "Ticket / Kassabon",
+  proforma: "Proforma",
+  credit_note: "Note de crédit / Creditnota",
+  delivery_note: "Bon de livraison / Leveringsbon",
+};
+
+const STATUS_CONFIG = {
+  draft: { label: "Brouillon", color: "bg-slate-100 text-slate-700" },
+  sent: { label: "Envoyé", color: "bg-blue-100 text-blue-700" },
+  accepted: { label: "Accepté", color: "bg-green-100 text-green-700" },
+  unpaid: { label: "Impayé", color: "bg-red-100 text-red-700" },
+  partially_paid: { label: "Partiellement payé", color: "bg-amber-100 text-amber-700" },
+  paid: { label: "Payé", color: "bg-green-100 text-green-700" },
+  cancelled: { label: "Annulé", color: "bg-gray-100 text-gray-700" },
+  credited: { label: "Crédité", color: "bg-purple-100 text-purple-700" },
+};
+
+export default function DocumentDetail() {
+  const { docId } = useParams();
+  const navigate = useNavigate();
+  const [document, setDocument] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+
+  useEffect(() => {
+    fetchDocument();
+  }, [docId]);
+
+  const fetchDocument = async () => {
+    try {
+      const response = await axios.get(`${API}/documents/${docId}`);
+      setDocument(response.data);
+      setPaymentAmount((response.data.total - response.data.paid_total).toFixed(2));
+    } catch (error) {
+      toast.error("Document non trouvé");
+      navigate("/documents");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddPayment = async () => {
+    const amount = parseFloat(paymentAmount);
+    if (!amount || amount <= 0) {
+      toast.error("Montant invalide");
+      return;
+    }
+
+    try {
+      await axios.post(`${API}/documents/${docId}/pay`, {
+        method: paymentMethod,
+        amount: amount
+      });
+      toast.success("Paiement enregistré");
+      setShowPaymentDialog(false);
+      fetchDocument();
+    } catch (error) {
+      toast.error("Erreur lors du paiement");
+    }
+  };
+
+  const handleConvert = async () => {
+    try {
+      const response = await axios.post(`${API}/documents/${docId}/convert?target_type=invoice`);
+      toast.success(`Converti en facture: ${response.data.number}`);
+      navigate(`/documents/${response.data.id}`);
+    } catch (error) {
+      toast.error("Erreur lors de la conversion");
+    }
+  };
+
+  const handleDuplicate = async () => {
+    try {
+      const response = await axios.post(`${API}/documents/${docId}/duplicate`);
+      toast.success(`Document dupliqué: ${response.data.number}`);
+      navigate(`/documents/${response.data.id}`);
+    } catch (error) {
+      toast.error("Erreur lors de la duplication");
+    }
+  };
+
+  const handlePrint = () => {
+    generateReceiptPDF(document, null);
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-4 border-brand-navy border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!document) return null;
+
+  const remaining = document.total - document.paid_total;
+  const statusConfig = STATUS_CONFIG[document.status] || {};
+
+  return (
+    <div className="p-6" data-testid="document-detail">
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="ghost" onClick={() => navigate(-1)}>
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Retour
+        </Button>
+        <div className="flex-1">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-heading font-bold text-brand-navy">
+              {document.number}
+            </h1>
+            <Badge className={statusConfig.color}>
+              {statusConfig.label}
+            </Badge>
+          </div>
+          <p className="text-muted-foreground">
+            {DOC_TYPE_LABELS[document.doc_type]} • {new Date(document.created_at).toLocaleDateString("fr-BE")}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handlePrint}>
+            <Printer className="w-4 h-4 mr-2" />
+            Imprimer
+          </Button>
+          <Button variant="outline" onClick={handleDuplicate}>
+            <Copy className="w-4 h-4 mr-2" />
+            Dupliquer
+          </Button>
+          {document.doc_type === "quote" && document.status !== "accepted" && (
+            <Button variant="outline" onClick={handleConvert}>
+              <ArrowRight className="w-4 h-4 mr-2" />
+              Convertir
+            </Button>
+          )}
+          {remaining > 0 && (
+            <Button 
+              className="bg-brand-orange hover:bg-brand-orange/90"
+              onClick={() => setShowPaymentDialog(true)}
+            >
+              <CreditCard className="w-4 h-4 mr-2" />
+              Encaisser
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Content */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Customer Info */}
+          {document.customer_name && (
+            <div className="bg-white rounded-lg border border-slate-200 p-6">
+              <h3 className="font-heading font-bold mb-4 flex items-center gap-2">
+                <User className="w-5 h-5 text-brand-navy" />
+                Client / Klant
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="font-medium">{document.customer_name}</p>
+                  {document.customer_vat && (
+                    <p className="text-sm text-muted-foreground">TVA: {document.customer_vat}</p>
+                  )}
+                </div>
+                {document.customer_address && (
+                  <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <MapPin className="w-4 h-4 mt-0.5" />
+                    <span>{document.customer_address}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Items */}
+          <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+            <div className="p-4 border-b border-slate-200">
+              <h3 className="font-heading font-bold flex items-center gap-2">
+                <FileText className="w-5 h-5 text-brand-navy" />
+                Articles / Artikelen
+              </h3>
+            </div>
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="text-left p-4 text-sm font-medium">SKU</th>
+                  <th className="text-left p-4 text-sm font-medium">Description</th>
+                  <th className="text-center p-4 text-sm font-medium">Qté</th>
+                  <th className="text-right p-4 text-sm font-medium">Prix unit.</th>
+                  <th className="text-right p-4 text-sm font-medium">TVA</th>
+                  <th className="text-right p-4 text-sm font-medium">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {document.items?.map((item) => (
+                  <tr key={item.id} className="border-b border-slate-100">
+                    <td className="p-4 font-mono text-sm">{item.sku}</td>
+                    <td className="p-4">{item.name}</td>
+                    <td className="p-4 text-center">{item.qty}</td>
+                    <td className="p-4 text-right">€{Math.abs(item.unit_price).toFixed(2)}</td>
+                    <td className="p-4 text-right">{item.vat_rate}%</td>
+                    <td className="p-4 text-right font-bold">€{Math.abs(item.line_total).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Related Documents */}
+          {document.related_documents?.length > 0 && (
+            <div className="bg-white rounded-lg border border-slate-200 p-6">
+              <h3 className="font-heading font-bold mb-4">Documents liés</h3>
+              <div className="space-y-2">
+                {document.related_documents.map((relId) => (
+                  <Button 
+                    key={relId} 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => navigate(`/documents/${relId}`)}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Document {relId.slice(0, 8)}...
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Totals */}
+          <div className="bg-white rounded-lg border border-slate-200 p-6">
+            <h3 className="font-heading font-bold mb-4">Récapitulatif</h3>
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Sous-total HT</span>
+                <span>€{document.subtotal?.toFixed(2)}</span>
+              </div>
+              {document.global_discount_value > 0 && (
+                <div className="flex justify-between text-brand-orange">
+                  <span>Remise</span>
+                  <span>
+                    -{document.global_discount_type === "percent" 
+                      ? `${document.global_discount_value}%` 
+                      : `€${document.global_discount_value}`}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">TVA (21%)</span>
+                <span>€{document.vat_total?.toFixed(2)}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between text-lg font-bold">
+                <span>Total TTC</span>
+                <span className="text-brand-navy">€{document.total?.toFixed(2)}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between text-green-600">
+                <span>Payé</span>
+                <span>€{document.paid_total?.toFixed(2)}</span>
+              </div>
+              {remaining > 0 && (
+                <div className="flex justify-between text-red-600 font-bold">
+                  <span>Reste à payer</span>
+                  <span>€{remaining.toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Payment History */}
+          <div className="bg-white rounded-lg border border-slate-200 p-6">
+            <h3 className="font-heading font-bold mb-4 flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-brand-navy" />
+              Paiements
+            </h3>
+            {document.payments?.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Aucun paiement</p>
+            ) : (
+              <div className="space-y-3">
+                {document.payments?.map((payment) => (
+                  <div 
+                    key={payment.id} 
+                    className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
+                  >
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <div>
+                        <p className="text-sm font-medium capitalize">
+                          {payment.method === "cash" ? "Espèces" : payment.method === "card" ? "Carte" : "Virement"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(payment.created_at).toLocaleString("fr-BE")}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="font-bold text-green-600">
+                      €{payment.amount?.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {remaining > 0 && (
+              <Button 
+                className="w-full mt-4 bg-brand-orange hover:bg-brand-orange/90"
+                onClick={() => setShowPaymentDialog(true)}
+              >
+                <CreditCard className="w-4 h-4 mr-2" />
+                Ajouter un paiement
+              </Button>
+            )}
+          </div>
+
+          {/* Notes */}
+          {document.notes && (
+            <div className="bg-white rounded-lg border border-slate-200 p-6">
+              <h3 className="font-heading font-bold mb-2">Notes</h3>
+              <p className="text-sm text-muted-foreground">{document.notes}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Payment Dialog */}
+      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ajouter un paiement</DialogTitle>
+            <DialogDescription>
+              Reste à payer: €{remaining.toFixed(2)}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Méthode</label>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Espèces / Cash</SelectItem>
+                  <SelectItem value="card">Carte / Kaart</SelectItem>
+                  <SelectItem value="bank_transfer">Virement / Overschrijving</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Montant</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">€</span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
+              Annuler
+            </Button>
+            <Button 
+              className="bg-brand-orange hover:bg-brand-orange/90"
+              onClick={handleAddPayment}
+            >
+              Confirmer le paiement
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
