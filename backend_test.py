@@ -827,7 +827,7 @@ class POSAPITester:
         
         success, negative_response = self.run_test("Test Negative Payment", "POST", 
                                                   f"documents/{edge_invoice_id}/pay", 
-                                                  expected_status=400)  # Should reject
+                                                  expected_status=422, data=negative_payment_data)  # Should reject with validation error
         
         negative_handled = not success  # Should fail
         self.log_test("Negative Payment Rejection", negative_handled, 
