@@ -42,6 +42,29 @@ export default function POSScreen() {
         ]);
         setProducts(productsRes.data);
         setCategories(categoriesRes.data);
+        
+        // Load reorder cart if exists
+        const reorderCart = sessionStorage.getItem('reorder_cart');
+        const reorderCustomerId = sessionStorage.getItem('reorder_customer_id');
+        
+        if (reorderCart) {
+          const cartItems = JSON.parse(reorderCart);
+          setCart(cartItems);
+          sessionStorage.removeItem('reorder_cart');
+          
+          // Load customer if exists
+          if (reorderCustomerId) {
+            try {
+              const customerRes = await axios.get(`${API}/customers/${reorderCustomerId}`);
+              setSelectedCustomer(customerRes.data);
+            } catch (err) {
+              console.error("Error loading reorder customer:", err);
+            }
+            sessionStorage.removeItem('reorder_customer_id');
+          }
+          
+          toast.success("Commande rechargée dans le panier");
+        }
       } catch (error) {
         toast.error("Erreur de chargement / Laadfout");
         console.error(error);
