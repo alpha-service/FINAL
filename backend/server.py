@@ -105,6 +105,9 @@ class Product(BaseModel):
     stock_qty: int = 0
     min_stock: int = 0
     image_url: Optional[str] = None
+    origin: ProductOrigin = ProductOrigin.LOCAL
+    shopify_variant_id: Optional[str] = None
+    shopify_product_id: Optional[str] = None
 
 class Customer(BaseModel):
     model_config = ConfigDict(extra="ignore")
