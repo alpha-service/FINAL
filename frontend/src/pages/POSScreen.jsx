@@ -17,6 +17,7 @@ import { generateReceiptPDF } from "@/utils/pdfGenerator";
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function POSScreen() {
+  const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [cart, setCart] = useState([]);
