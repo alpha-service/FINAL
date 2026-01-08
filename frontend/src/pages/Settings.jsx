@@ -289,6 +289,217 @@ export default function Settings() {
           )}
         </div>
 
+        {/* Shopify Integration */}
+        <div className="bg-white rounded-lg border border-slate-200 p-6 lg:col-span-2">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <ShoppingBag className="w-5 h-5 text-brand-navy" />
+              <h2 className="font-heading font-bold">Shopify Integration</h2>
+            </div>
+            {shopifySettings && (
+              <Badge className={shopifySettings.auto_sync_enabled ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-800"}>
+                {shopifySettings.auto_sync_enabled ? "Sync Auto" : "Sync Manuel"}
+              </Badge>
+            )}
+          </div>
+
+          {shopifyLoading ? (
+            <p className="text-sm text-muted-foreground">Chargement...</p>
+          ) : (
+            <div className="space-y-6">
+              {/* Connection Settings */}
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Store Domain</label>
+                  <Input 
+                    placeholder="yourstore.myshopify.com"
+                    value={shopifySettings?.store_domain || ""}
+                    onChange={(e) => handleShopifySettingsChange("store_domain", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Access Token (Admin API)</label>
+                  <Input 
+                    type="password"
+                    placeholder="shpat_..."
+                    value={shopifySettings?.access_token || ""}
+                    onChange={(e) => handleShopifySettingsChange("access_token", e.target.value)}
+                  />
+                </div>
+                <Button onClick={saveShopifySettings} variant="outline" size="sm">
+                  Sauvegarder la configuration
+                </Button>
+              </div>
+
+              <Separator />
+
+              {/* Sync Toggles */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Import Produits</p>
+                    <p className="text-sm text-muted-foreground">Importer produits depuis Shopify vers POS</p>
+                  </div>
+                  <Switch 
+                    checked={shopifySettings?.import_products_enabled || false}
+                    onCheckedChange={(checked) => {
+                      handleShopifySettingsChange("import_products_enabled", checked);
+                      saveShopifySettings();
+                    }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Export Stock</p>
+                    <p className="text-sm text-muted-foreground">Pousser les stocks POS vers Shopify</p>
+                  </div>
+                  <Switch 
+                    checked={shopifySettings?.export_stock_enabled || false}
+                    onCheckedChange={(checked) => {
+                      handleShopifySettingsChange("export_stock_enabled", checked);
+                      saveShopifySettings();
+                    }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Import Commandes</p>
+                    <p className="text-sm text-muted-foreground">Importer commandes Shopify comme ventes</p>
+                  </div>
+                  <Switch 
+                    checked={shopifySettings?.import_orders_enabled || false}
+                    onCheckedChange={(checked) => {
+                      handleShopifySettingsChange("import_orders_enabled", checked);
+                      saveShopifySettings();
+                    }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Synchronisation automatique</p>
+                    <p className="text-sm text-muted-foreground">
+                      Sync tous les {shopifySettings?.sync_interval_minutes || 10} minutes
+                    </p>
+                  </div>
+                  <Switch 
+                    checked={shopifySettings?.auto_sync_enabled || false}
+                    onCheckedChange={(checked) => {
+                      handleShopifySettingsChange("auto_sync_enabled", checked);
+                      saveShopifySettings();
+                    }}
+                  />
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Manual Sync Actions */}
+              <div>
+                <h3 className="font-medium mb-3">Actions manuelles</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <Button 
+                    variant="outline" 
+                    className="flex items-center gap-2"
+                    onClick={handleSyncProducts}
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Import Produits
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="flex items-center gap-2"
+                    onClick={handleSyncStock}
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Push Stock
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="flex items-center gap-2"
+                    onClick={handleSyncOrders}
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Import Commandes
+                  </Button>
+                </div>
+              </div>
+
+              {/* Last Sync Info */}
+              {shopifySettings && (
+                <div className="p-4 bg-slate-50 rounded-lg">
+                  <h3 className="font-medium text-sm mb-2">Dernières synchronisations</h3>
+                  <div className="space-y-1 text-sm text-muted-foreground">
+                    <div className="flex justify-between">
+                      <span>Produits:</span>
+                      <span>{shopifySettings.last_product_sync ? new Date(shopifySettings.last_product_sync).toLocaleString("fr-BE") : "Jamais"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Stock:</span>
+                      <span>{shopifySettings.last_stock_sync ? new Date(shopifySettings.last_stock_sync).toLocaleString("fr-BE") : "Jamais"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Commandes:</span>
+                      <span>{shopifySettings.last_order_sync ? new Date(shopifySettings.last_order_sync).toLocaleString("fr-BE") : "Jamais"}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Unmapped Products Alert */}
+              {unmappedProducts.length > 0 && (
+                <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                  <div className="flex items-center gap-2 text-amber-800">
+                    <AlertTriangle className="w-5 h-5" />
+                    <div>
+                      <p className="font-medium">{unmappedProducts.length} produits non mappés</p>
+                      <p className="text-sm">Ces produits Shopify n'ont pas pu être automatiquement importés (SKU/code-barres manquant ou dupliqué)</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Sync Logs Toggle */}
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowSyncLogs(!showSyncLogs)}
+                className="w-full"
+              >
+                {showSyncLogs ? "Masquer" : "Afficher"} les logs de synchronisation ({syncLogs.length})
+              </Button>
+
+              {/* Sync Logs */}
+              {showSyncLogs && syncLogs.length > 0 && (
+                <div className="space-y-2">
+                  {syncLogs.map((log) => (
+                    <div key={log.id} className="p-3 bg-slate-50 rounded-lg text-sm">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          {getSyncStatusIcon(log.status)}
+                          <span className="font-medium">{log.sync_type}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(log.created_at).toLocaleString("fr-BE")}
+                        </span>
+                      </div>
+                      <div className="text-muted-foreground">
+                        {log.items_processed > 0 ? (
+                          <span>{log.items_processed} traités • {log.items_succeeded} réussis • {log.items_failed} échecs</span>
+                        ) : (
+                          <span>{log.details?.message || "En attente"}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* System Info */}
         <div className="bg-white rounded-lg border border-slate-200 p-6">
           <div className="flex items-center gap-3 mb-4">
