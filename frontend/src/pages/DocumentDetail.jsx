@@ -6,24 +6,17 @@ import {
   ArrowLeft,
   Printer,
   Download,
-  CreditCard,
-  RotateCcw,
   Copy,
   ArrowRight,
-  FileText,
-  User,
-  Calendar,
-  MapPin,
-  Receipt,
-  CheckCircle
+  CreditCard,
+  ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { generateReceiptPDF } from "@/utils/pdfGenerator";
+import DocumentViewer from "@/components/DocumentViewer";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
