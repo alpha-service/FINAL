@@ -161,7 +161,7 @@ export const generateReceiptPDF = (sale, customer = null) => {
     }
   });
 
-  y = doc.lastAutoTable.finalY + 10;
+  y = doc.previousAutoTable.finalY + 10;
 
   // Totals section
   const totalsX = pageWidth - margin - 70;
