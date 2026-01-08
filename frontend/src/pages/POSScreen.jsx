@@ -436,6 +436,16 @@ export default function POSScreen() {
             Annuler
           </Button>
           <Button
+            variant="outline"
+            className="flex-1"
+            onClick={handleSaveAsDevis}
+            disabled={cart.length === 0}
+            data-testid="save-devis-btn"
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            Devis
+          </Button>
+          <Button
             className="flex-1 bg-brand-orange hover:bg-brand-orange/90 pay-button"
             onClick={() => setShowPayment(true)}
             disabled={cart.length === 0}
