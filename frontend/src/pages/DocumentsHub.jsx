@@ -96,9 +96,29 @@ export default function DocumentsHub() {
     }
   };
 
-  const handleDownloadPDF = (doc) => {
-    generateReceiptPDF(doc, null);
-    toast.success("PDF téléchargé");
+  const handleDownloadPDF = async (doc) => {
+    try {
+      const response = await fetch(`${API}/documents/${doc.id}/pdf`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${doc.number}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success("PDF téléchargé");
+    } catch (error) {
+      console.error("PDF download error:", error);
+      toast.error("Erreur lors du téléchargement du PDF");
+    }
   };
 
   const getDocTypeStats = () => {
