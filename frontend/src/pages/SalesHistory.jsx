@@ -284,6 +284,7 @@ export default function SalesHistory() {
                 <th className="text-left p-4 font-medium text-sm">N° Document</th>
                 <th className="text-left p-4 font-medium text-sm">Date</th>
                 <th className="text-left p-4 font-medium text-sm">Client</th>
+                <th className="text-center p-4 font-medium text-sm">Canal</th>
                 <th className="text-left p-4 font-medium text-sm">Articles</th>
                 <th className="text-right p-4 font-medium text-sm">Total</th>
                 <th className="text-center p-4 font-medium text-sm">Statut</th>
@@ -294,13 +295,13 @@ export default function SalesHistory() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={9} className="p-8 text-center text-muted-foreground">
                     Chargement...
                   </td>
                 </tr>
               ) : filteredSales.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={9} className="p-8 text-center text-muted-foreground">
                     Aucune vente trouvée
                   </td>
                 </tr>
