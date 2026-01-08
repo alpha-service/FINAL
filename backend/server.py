@@ -1109,6 +1109,142 @@ async def send_peppol(doc_id: str):
     
     return {"status": "pending", "message": "Peppol integration not yet implemented"}
 
+# --- PDF Generation ---
+@api_router.get("/documents/{doc_id}/pdf")
+async def generate_document_pdf(doc_id: str):
+    """Generate PDF for a document"""
+    doc = await db.documents.find_one({"id": doc_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    # Create PDF in memory
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    
+    # Company header
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(50, height - 50, "ALPHA&CO BOUWMATERIALEN & DESIGN")
+    c.setFont("Helvetica", 9)
+    c.drawString(50, height - 65, "Ninoofsesteenweg 77-79, 1700 Dilbeek")
+    c.drawString(50, height - 78, "TVA: BE 1028.386.674")
+    
+    # Document info
+    c.setFont("Helvetica-Bold", 14)
+    doc_type_labels = {
+        "quote": "DEVIS / OFFERTE",
+        "invoice": "FACTURE / FACTUUR",
+        "receipt": "TICKET DE CAISSE / KASSABON",
+        "credit_note": "NOTE DE CRÉDIT / CREDITNOTA",
+        "proforma": "PROFORMA",
+        "delivery_note": "BON DE LIVRAISON / LEVERINGSBON"
+    }
+    doc_title = doc_type_labels.get(doc.get("doc_type", ""), "DOCUMENT")
+    c.drawString(50, height - 110, doc_title)
+    
+    c.setFont("Helvetica", 10)
+    c.drawString(50, height - 130, f"N°: {doc.get('number', '')}")
+    c.drawString(50, height - 145, f"Date: {datetime.fromisoformat(doc['created_at']).strftime('%d/%m/%Y')}")
+    
+    # Customer info
+    if doc.get("customer_name"):
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(350, height - 130, "Client / Klant:")
+        c.setFont("Helvetica", 10)
+        c.drawString(350, height - 145, doc["customer_name"])
+        if doc.get("customer_vat"):
+            c.drawString(350, height - 160, f"TVA: {doc['customer_vat']}")
+        if doc.get("customer_address"):
+            c.drawString(350, height - 175, doc["customer_address"])
+    
+    # Status watermark for unpaid
+    if doc.get("status") in ["unpaid", "partially_paid"]:
+        c.setFont("Helvetica-Bold", 60)
+        c.setFillColorRGB(0.9, 0.1, 0.1, alpha=0.3)
+        c.saveState()
+        c.translate(width/2, height/2)
+        c.rotate(45)
+        c.drawCentredString(0, 0, "IMPAYÉ")
+        c.restoreState()
+        c.setFillColorRGB(0, 0, 0)
+    
+    # Items table
+    y_position = height - 220
+    
+    # Table headers
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(50, y_position, "SKU")
+    c.drawString(130, y_position, "Description")
+    c.drawString(320, y_position, "Qté")
+    c.drawString(370, y_position, "Prix Unit.")
+    c.drawString(440, y_position, "TVA%")
+    c.drawString(490, y_position, "Total")
+    
+    c.line(50, y_position - 5, width - 50, y_position - 5)
+    y_position -= 20
+    
+    # Items
+    c.setFont("Helvetica", 9)
+    for item in doc.get("items", []):
+        if y_position < 100:
+            c.showPage()
+            y_position = height - 50
+        
+        c.drawString(50, y_position, str(item.get("sku", ""))[:15])
+        c.drawString(130, y_position, str(item.get("name", ""))[:30])
+        c.drawRightString(350, y_position, str(item.get("qty", 0)))
+        c.drawRightString(420, y_position, f"€{abs(item.get('unit_price', 0)):.2f}")
+        c.drawRightString(470, y_position, f"{item.get('vat_rate', 21):.0f}%")
+        c.drawRightString(540, y_position, f"€{abs(item.get('line_total', 0)):.2f}")
+        y_position -= 15
+    
+    # Totals
+    y_position -= 10
+    c.line(400, y_position, width - 50, y_position)
+    y_position -= 20
+    
+    c.setFont("Helvetica", 10)
+    c.drawString(400, y_position, "Sous-total:")
+    c.drawRightString(540, y_position, f"€{doc.get('subtotal', 0):.2f}")
+    y_position -= 15
+    
+    c.drawString(400, y_position, "TVA (21%):")
+    c.drawRightString(540, y_position, f"€{doc.get('vat_total', 0):.2f}")
+    y_position -= 15
+    
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(400, y_position, "TOTAL:")
+    c.drawRightString(540, y_position, f"€{doc.get('total', 0):.2f}")
+    
+    # Payments if any
+    if doc.get("payments") and len(doc["payments"]) > 0:
+        y_position -= 25
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(400, y_position, "Payé:")
+        c.drawRightString(540, y_position, f"€{doc.get('paid_total', 0):.2f}")
+        
+        remaining = doc.get('total', 0) - doc.get('paid_total', 0)
+        if remaining > 0:
+            y_position -= 15
+            c.setFont("Helvetica", 10)
+            c.drawString(400, y_position, "Reste à payer:")
+            c.drawRightString(540, y_position, f"€{remaining:.2f}")
+    
+    # Footer
+    c.setFont("Helvetica", 8)
+    c.drawCentredString(width/2, 30, "Merci pour votre confiance / Bedankt voor uw vertrouwen")
+    
+    c.save()
+    buffer.seek(0)
+    
+    # Return PDF as streaming response
+    filename = f"{doc.get('number', 'document')}.pdf"
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
 # --- Shopify Integration Endpoints ---
 @api_router.get("/shopify/settings")
 async def get_shopify_settings():
