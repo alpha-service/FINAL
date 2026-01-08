@@ -910,21 +910,32 @@ def main():
     """Main test runner"""
     import sys
     
-    # Check if we should run document-specific tests
-    run_document_tests = len(sys.argv) > 1 and sys.argv[1] == "documents"
+    # Check test type from command line arguments
+    test_type = "full"
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "documents":
+            test_type = "documents"
+        elif sys.argv[1] == "workflow":
+            test_type = "workflow"
     
     tester = POSAPITester()
     
     try:
-        if run_document_tests:
+        if test_type == "documents":
             success = tester.run_document_tests()
+        elif test_type == "workflow":
+            # Get required data first
+            tester.test_api_root()
+            tester.test_products()
+            tester.test_customers()
+            success = tester.test_document_workflow()
         else:
             success = tester.run_all_tests()
         
         # Save detailed results
         results = {
             "timestamp": datetime.now().isoformat(),
-            "test_type": "document_tests" if run_document_tests else "full_tests",
+            "test_type": test_type,
             "summary": {
                 "total_tests": tester.tests_run,
                 "passed_tests": tester.tests_passed,
@@ -936,7 +947,9 @@ def main():
                 "categories_count": len(tester.sample_data.get('categories', [])),
                 "products_count": len(tester.sample_data.get('products', [])),
                 "customers_count": len(tester.sample_data.get('customers', [])),
-                "document_created": bool(tester.sample_data.get('document'))
+                "document_created": bool(tester.sample_data.get('document')),
+                "test_quote_created": bool(tester.sample_data.get('test_quote')),
+                "test_invoice_created": bool(tester.sample_data.get('test_invoice'))
             }
         }
         
@@ -944,7 +957,13 @@ def main():
         import os
         os.makedirs('/app/test_reports', exist_ok=True)
         
-        filename = 'document_api_results.json' if run_document_tests else 'backend_api_results.json'
+        filename_map = {
+            "documents": "document_api_results.json",
+            "workflow": "document_workflow_results.json",
+            "full": "backend_api_results.json"
+        }
+        filename = filename_map.get(test_type, "backend_api_results.json")
+        
         with open(f'/app/test_reports/{filename}', 'w') as f:
             json.dump(results, f, indent=2)
         
