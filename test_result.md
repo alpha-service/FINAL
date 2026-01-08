@@ -373,6 +373,18 @@ frontend:
           agent: "testing"
           comment: "✅ PASSED: All document PDF download and navigation functionality working perfectly. 1) Eye icon (👁️) navigation from Documents Hub to Document Detail works correctly - navigates to /documents/{id} and loads complete document detail page. 2) Document Detail page displays all required sections: document number with status badge, customer info section, items table with columns (SKU, Description, Qté, Prix unit., TVA, Total), totals section (Sous-total, TVA, TOTAL), and action buttons (Imprimer, Dupliquer, Convertir, Encaisser). 3) PDF download from Documents Hub (⬇️ Download icon) triggers browser download successfully. 4) PDF download from Document Detail (Imprimer button) generates valid PDF files (verified 2222 bytes PDF format). 5) Documents Hub displays 6 documents in proper table format with Eye and Download icons in Actions column. All navigation flows and PDF generation endpoints are functional."
 
+  - task: "Final Document Usability Flow Acceptance Test"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/DocumentsHub.jsx, /app/frontend/src/pages/DocumentDetail.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "🎯 FINAL ACCEPTANCE TEST PASSED: Complete Document Usability Flow verified successfully. ✅ 1. Eye icon navigation: Successfully navigates from Documents Hub to Document Detail page (/documents/:id) - NOT a placeholder. ✅ 2. Document Detail page structure: Displays ALL required sections including document number with status badge, customer information section, items table with correct columns (SKU, Description, Qté, Prix unit., TVA, Total), totals section (Sous-total HT, TVA 21%, Total TTC), and action buttons (Imprimer, Dupliquer, Encaisser if unpaid). ✅ 3. PDF Download: Imprimer button triggers real browser download functionality. ✅ 4. Partial Payment Flow: Created new quote from POS with Encaisser button available - payment dialog opens correctly for partial payments. ✅ 5. Status Updates: Documents Hub correctly shows status distribution (Paid: 5, Unpaid: 2, Partial: 2) and status changes are reflected properly. ALL acceptance criteria met - this is the user's final acceptance test and the complete document workflow is fully functional!"
+
 metadata:
   created_by: "testing_agent"
   version: "1.0"
