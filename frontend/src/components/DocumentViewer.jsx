@@ -393,7 +393,15 @@ export default function DocumentViewer({ document }) {
           .document-viewer > div {
             box-shadow: none;
             margin: 0;
-            page-break-after: always;
+            padding: 10mm;
+            max-height: none;
+            overflow: visible;
+            page-break-after: avoid;
+            page-break-inside: avoid;
+          }
+          @page {
+            size: A4;
+            margin: 0;
           }
         }
       `}</style>
