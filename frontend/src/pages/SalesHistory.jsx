@@ -140,6 +140,28 @@ export default function SalesHistory() {
     }
   };
 
+  const handleReorder = (sale) => {
+    // Store items in sessionStorage to load in POS
+    const cartItems = sale.items.map(item => ({
+      product_id: item.product_id,
+      sku: item.sku,
+      name: item.name,
+      qty: item.qty,
+      unit_price: item.unit_price,
+      vat_rate: item.vat_rate || 21,
+      discount_type: item.discount_type,
+      discount_value: item.discount_value || 0
+    }));
+    
+    sessionStorage.setItem('reorder_cart', JSON.stringify(cartItems));
+    if (sale.customer_id) {
+      sessionStorage.setItem('reorder_customer_id', sale.customer_id);
+    }
+    
+    toast.success("Articles chargés dans le panier");
+    navigate('/pos');
+  };
+
   const handleReturn = (sale) => {
     setSelectedSale(sale);
     setReturnItems(sale.items.map(item => ({ ...item, returnQty: 0, reason: "" })));
