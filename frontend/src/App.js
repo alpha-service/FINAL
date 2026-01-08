@@ -9,6 +9,9 @@ import DocumentDetail from "@/pages/DocumentDetail";
 import CashRegister from "@/pages/CashRegister";
 import Inventory from "@/pages/Inventory";
 import Settings from "@/pages/Settings";
+import Products from "@/pages/Products";
+import Clients from "@/pages/Clients";
+import Reports from "@/pages/Reports";
 
 function App() {
   return (
@@ -21,6 +24,9 @@ function App() {
             <Route path="sales" element={<SalesHistory />} />
             <Route path="documents" element={<DocumentsHub />} />
             <Route path="documents/:docId" element={<DocumentDetail />} />
+            <Route path="products" element={<Products />} />
+            <Route path="clients" element={<Clients />} />
+            <Route path="reports" element={<Reports />} />
             <Route path="cash-register" element={<CashRegister />} />
             <Route path="inventory" element={<Inventory />} />
             <Route path="settings" element={<Settings />} />
