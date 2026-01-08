@@ -46,40 +46,56 @@ export default function DocumentViewer({ document }) {
 
   // Group VAT lines by rate
   const vatBreakdown = {};
+  let totalHT = 0;
+  let totalVAT = 0;
+  
   document.items?.forEach(item => {
     const rate = item.vat_rate || 21;
+    const lineTotal = item.line_total || 0;
+    const baseAmount = lineTotal / (1 + rate / 100);
+    const vatAmount = lineTotal - baseAmount;
+    
     if (!vatBreakdown[rate]) {
       vatBreakdown[rate] = { base: 0, vat: 0 };
     }
-    const lineTotal = item.line_total || 0;
-    const vatAmount = lineTotal * (rate / 100) / (1 + rate / 100);
-    const baseAmount = lineTotal - vatAmount;
     vatBreakdown[rate].base += baseAmount;
     vatBreakdown[rate].vat += vatAmount;
+    
+    totalHT += baseAmount;
+    totalVAT += vatAmount;
   });
 
   return (
-    <div className="document-viewer bg-white" style={{ fontFamily: 'Inter, sans-serif' }}>
+    <div className="document-viewer bg-slate-100 py-6" style={{ fontFamily: 'Inter, sans-serif' }}>
       {/* A4 Container */}
       <div className="relative bg-white shadow-lg mx-auto" style={{ 
         width: '210mm',
         minHeight: '297mm',
-        padding: '20mm',
+        padding: '15mm',
         position: 'relative'
       }}>
-        {/* Watermark */}
+        {/* Triangle Watermark Background */}
+        <div 
+          className="absolute inset-0 flex items-center justify-center pointer-events-none"
+          style={{ opacity: 0.03, zIndex: 0 }}
+        >
+          <img 
+            src="https://customer-assets.emergentagent.com/job_laughing-kare/artifacts/ke0myhde_alpha-triangle-bg.png.png"
+            alt=""
+            style={{ width: '400px', height: '400px' }}
+          />
+        </div>
+
+        {/* Status Watermark */}
         {showWatermark && (
           <div 
             className="absolute inset-0 flex items-center justify-center pointer-events-none"
-            style={{
-              zIndex: 1,
-              opacity: 0.08
-            }}
+            style={{ zIndex: 1, opacity: 0.08 }}
           >
             <div 
               className="font-bold text-red-600"
               style={{
-                fontSize: '80px',
+                fontSize: '72px',
                 transform: 'rotate(-45deg)',
                 lineHeight: '1',
                 whiteSpace: 'nowrap'
@@ -92,194 +108,273 @@ export default function DocumentViewer({ document }) {
 
         {/* Content */}
         <div style={{ position: 'relative', zIndex: 2 }}>
-          {/* Header */}
-          <div className="flex justify-between items-start mb-8">
-            {/* Company Logo/Name */}
+          {/* Header: Logo + Opening Hours */}
+          <div className="flex justify-between items-start mb-6">
+            {/* Left: Logo + Brand */}
             <div>
-              <div 
-                className="font-bold text-brand-navy mb-2"
-                style={{ 
-                  fontFamily: 'Montserrat, sans-serif',
-                  fontSize: '24px',
-                  lineHeight: '1.2'
-                }}
-              >
-                ALPHA&CO
-              </div>
-              <div className="text-xs text-slate-600 space-y-0.5">
-                <div>Bouwmaterialen & Design</div>
-                <div>Ninoofsesteenweg 77-79</div>
-                <div>1700 Dilbeek, België</div>
-                <div>TVA: BE 1028.386.674</div>
+              <img 
+                src="https://customer-assets.emergentagent.com/job_laughing-kare/artifacts/tf9bgx5t_alpha_rect_1000x500.png"
+                alt="ALPHA&CO"
+                style={{ height: '50px', marginBottom: '8px' }}
+              />
+              <div className="text-xs text-slate-600">
+                <div className="font-semibold">BOUWMATERIALEN EN DESIGN</div>
               </div>
             </div>
 
-            {/* Document Info */}
-            <div className="text-right">
-              <div 
-                className={`font-bold ${docConfig.color} mb-2`}
-                style={{ 
-                  fontFamily: 'Montserrat, sans-serif',
-                  fontSize: '20px'
-                }}
-              >
-                {docConfig.title}
-              </div>
-              <div className="text-xs text-slate-600 space-y-1">
-                <div><span className="font-medium">N°:</span> {document.number}</div>
-                <div><span className="font-medium">Date:</span> {new Date(document.created_at).toLocaleDateString('fr-BE')}</div>
-                {document.due_date && (
-                  <div><span className="font-medium">Échéance:</span> {new Date(document.due_date).toLocaleDateString('fr-BE')}</div>
-                )}
-                {document.channel && (
-                  <div><span className="font-medium">Canal:</span> {document.channel === 'online' ? '🌐 En ligne' : '🏪 Magasin'}</div>
-                )}
+            {/* Right: Opening Hours / Store Info */}
+            <div className="text-right text-xs text-slate-600">
+              <div className="font-semibold mb-1">Les heures d'ouverture / Openingsuren</div>
+              <div>Lu-Ve / Ma-Vr: 08h00 - 17h30</div>
+              <div>Sa / Za: 09h00 - 13h00</div>
+              <div className="mt-2">
+                <div>Tél: +32 2 569 00 74</div>
+                <div>info@alphaco.be</div>
               </div>
             </div>
           </div>
 
-          {/* Client Block */}
-          {document.customer_name && (
-            <div className="mb-8 p-4 bg-slate-50 rounded-lg border border-slate-200">
-              <div className="text-xs font-medium text-slate-500 mb-2">CLIENT / KLANT</div>
-              <div className="text-sm">
-                <div className="font-bold text-brand-navy mb-1">{document.customer_name}</div>
-                {document.customer_address && (
-                  <div className="text-slate-600">{document.customer_address}</div>
-                )}
-                {document.customer_vat && (
-                  <div className="text-slate-600 mt-1">TVA: {document.customer_vat}</div>
-                )}
+          {/* Document Title + Number */}
+          <div className="text-center mb-6">
+            <h1 
+              className={`font-bold ${docConfig.color} mb-1`}
+              style={{ 
+                fontFamily: 'Montserrat, sans-serif',
+                fontSize: '24px',
+                letterSpacing: '0.5px'
+              }}
+            >
+              {docConfig.title}
+            </h1>
+            <div className="text-sm text-slate-600">
+              <span className="font-semibold">{document.number}</span>
+              {' • '}
+              {new Date(document.created_at).toLocaleDateString('fr-BE', { 
+                day: '2-digit', 
+                month: '2-digit', 
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </div>
+          </div>
+
+          {/* Seller vs Client Boxes */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            {/* Vendeur / Verkoper */}
+            <div className="border-2 border-slate-300 rounded p-4">
+              <div className="text-xs font-bold text-brand-navy mb-2">VENDEUR / VERKOPER</div>
+              <div className="text-xs space-y-0.5">
+                <div className="font-semibold">ALPHA & CO Bouwmaterialen BRL</div>
+                <div>Ninoofsesteenweg 77-79</div>
+                <div>1700 Dilbeek</div>
+                <div className="mt-2">
+                  <div>TVA: BE 1028.386.674</div>
+                  <div>Tél: +32 2 569 00 74</div>
+                  <div>www.alphaco.be</div>
+                </div>
               </div>
             </div>
-          )}
+
+            {/* Client */}
+            <div className="border-2 border-slate-300 rounded p-4">
+              <div className="text-xs font-bold text-brand-navy mb-2">CLIENT / KLANT</div>
+              {document.customer_name ? (
+                <div className="text-xs space-y-0.5">
+                  <div className="font-semibold">{document.customer_name}</div>
+                  {document.customer_address && (
+                    <div>{document.customer_address}</div>
+                  )}
+                  {document.customer_vat && (
+                    <div className="mt-2">TVA: {document.customer_vat}</div>
+                  )}
+                  {document.customer_reference && (
+                    <div>Réf: {document.customer_reference}</div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-xs text-slate-400 italic">Client comptoir</div>
+              )}
+            </div>
+          </div>
+
+          {/* Meta Row */}
+          <div className="mb-6">
+            <table className="w-full border border-slate-300" style={{ fontSize: '11px' }}>
+              <thead className="bg-slate-100">
+                <tr>
+                  <th className="border-r border-slate-300 p-2 text-left font-semibold">Date</th>
+                  <th className="border-r border-slate-300 p-2 text-left font-semibold">N° de {document.doc_type === 'quote' ? 'devis' : 'facture'}</th>
+                  <th className="border-r border-slate-300 p-2 text-left font-semibold">Référence</th>
+                  <th className="p-2 text-left font-semibold">Date d'échéance</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border-r border-slate-300 p-2">
+                    {new Date(document.created_at).toLocaleDateString('fr-BE')}
+                  </td>
+                  <td className="border-r border-slate-300 p-2 font-mono font-semibold">
+                    {document.number}
+                  </td>
+                  <td className="border-r border-slate-300 p-2">
+                    {document.customer_reference || '—'}
+                  </td>
+                  <td className="p-2">
+                    {document.due_date 
+                      ? new Date(document.due_date).toLocaleDateString('fr-BE')
+                      : document.payment_terms 
+                        ? `${document.payment_terms} jours`
+                        : '30 jours'}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
           {/* Line Items Table */}
-          <div className="mb-8">
-            <table className="w-full border-collapse" style={{ fontSize: '11px' }}>
+          <div className="mb-6">
+            <table className="w-full border-collapse border border-slate-300" style={{ fontSize: '10px' }}>
               <thead>
-                <tr className="border-b-2 border-brand-navy">
-                  <th className="text-left py-2 px-2 font-semibold text-brand-navy">SKU</th>
-                  <th className="text-left py-2 px-2 font-semibold text-brand-navy">Description</th>
-                  <th className="text-center py-2 px-2 font-semibold text-brand-navy">Qté</th>
-                  <th className="text-right py-2 px-2 font-semibold text-brand-navy">P.U.</th>
-                  <th className="text-right py-2 px-2 font-semibold text-brand-navy">Rem.</th>
-                  <th className="text-right py-2 px-2 font-semibold text-brand-navy">TVA%</th>
-                  <th className="text-right py-2 px-2 font-semibold text-brand-navy">Total</th>
+                <tr className="bg-slate-200">
+                  <th className="border border-slate-300 p-2 text-left font-semibold">REF / ART</th>
+                  <th className="border border-slate-300 p-2 text-left font-semibold">DESCRIPTION</th>
+                  <th className="border border-slate-300 p-2 text-center font-semibold">QUANTITÉ</th>
+                  <th className="border border-slate-300 p-2 text-right font-semibold">PRIX UNIT.</th>
+                  <th className="border border-slate-300 p-2 text-right font-semibold">REMISE</th>
+                  <th className="border border-slate-300 p-2 text-center font-semibold">TVA %</th>
+                  <th className="border border-slate-300 p-2 text-right font-semibold">TOTAL TTC</th>
                 </tr>
               </thead>
               <tbody>
                 {document.items?.map((item, idx) => (
-                  <tr 
-                    key={idx} 
-                    className={`border-b border-slate-200 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}
-                  >
-                    <td className="py-2 px-2 font-mono text-xs">{item.sku}</td>
-                    <td className="py-2 px-2">{item.name}</td>
-                    <td className="py-2 px-2 text-center">{item.qty}</td>
-                    <td className="py-2 px-2 text-right">€{Math.abs(item.unit_price).toFixed(2)}</td>
-                    <td className="py-2 px-2 text-right">
+                  <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                    <td className="border border-slate-300 p-2 font-mono text-xs">{item.sku}</td>
+                    <td className="border border-slate-300 p-2">{item.name}</td>
+                    <td className="border border-slate-300 p-2 text-center">{item.qty}</td>
+                    <td className="border border-slate-300 p-2 text-right font-mono">
+                      €{Math.abs(item.unit_price).toFixed(2)}
+                    </td>
+                    <td className="border border-slate-300 p-2 text-right">
                       {item.discount_value > 0 ? (
-                        item.discount_type === 'percent' ? `${item.discount_value}%` : `€${item.discount_value.toFixed(2)}`
+                        item.discount_type === 'percent' 
+                          ? `${item.discount_value}%` 
+                          : `€${item.discount_value.toFixed(2)}`
                       ) : '—'}
                     </td>
-                    <td className="py-2 px-2 text-right">{item.vat_rate}%</td>
-                    <td className="py-2 px-2 text-right font-semibold">€{Math.abs(item.line_total).toFixed(2)}</td>
+                    <td className="border border-slate-300 p-2 text-center">{item.vat_rate}%</td>
+                    <td className="border border-slate-300 p-2 text-right font-semibold font-mono">
+                      €{Math.abs(item.line_total).toFixed(2)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          {/* Totals Section */}
+          {/* Totals Area (Bottom Right) */}
           <div className="flex justify-end mb-8">
-            <div className="w-80">
-              {/* VAT Breakdown */}
-              <div className="bg-slate-50 rounded-lg border border-slate-200 p-4 mb-3">
-                <div className="text-xs font-semibold text-slate-600 mb-2">DÉTAIL TVA / BTW DETAIL</div>
-                {Object.entries(vatBreakdown).map(([rate, amounts]) => (
-                  <div key={rate} className="flex justify-between text-xs mb-1">
-                    <span className="text-slate-600">Base {rate}%</span>
-                    <span className="font-mono">€{amounts.base.toFixed(2)} + €{amounts.vat.toFixed(2)}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Totals Card */}
-              <div className="bg-brand-navy text-white rounded-lg p-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Sous-total HT</span>
-                  <span className="font-mono">€{(document.subtotal || 0).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>TVA</span>
-                  <span className="font-mono">€{(document.vat_total || 0).toFixed(2)}</span>
-                </div>
-                <div className="border-t border-white/20 pt-2 mt-2"></div>
-                <div className="flex justify-between text-lg font-bold">
-                  <span>TOTAL TTC</span>
-                  <span className="font-mono">€{(document.total || 0).toFixed(2)}</span>
-                </div>
-                
-                {/* Payment Info */}
-                {document.paid_total > 0 && (
-                  <>
-                    <div className="border-t border-white/20 pt-2 mt-2"></div>
-                    <div className="flex justify-between text-sm text-green-300">
-                      <span>Payé</span>
-                      <span className="font-mono">€{(document.paid_total || 0).toFixed(2)}</span>
-                    </div>
-                    {(document.total - document.paid_total) > 0.01 && (
-                      <div className="flex justify-between text-sm text-amber-300">
-                        <span>Reste à payer</span>
-                        <span className="font-mono">€{((document.total || 0) - (document.paid_total || 0)).toFixed(2)}</span>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
+            <div style={{ width: '320px' }}>
+              <table className="w-full border border-slate-300" style={{ fontSize: '11px' }}>
+                <tbody>
+                  <tr className="bg-slate-50">
+                    <td className="border-r border-slate-300 p-2 font-semibold">Total HT / Totaal excl. BTW</td>
+                    <td className="p-2 text-right font-mono">€{totalHT.toFixed(2)}</td>
+                  </tr>
+                  {Object.entries(vatBreakdown).map(([rate, amounts]) => (
+                    <tr key={rate} className="bg-white">
+                      <td className="border-r border-slate-300 p-2">TVA / BTW {rate}%</td>
+                      <td className="p-2 text-right font-mono">€{amounts.vat.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-brand-navy text-white">
+                    <td className="border-r border-white p-3 font-bold text-sm">Total TTC / Totaal incl. BTW</td>
+                    <td className="p-3 text-right font-mono font-bold text-lg">
+                      €{(document.total || 0).toFixed(2)}
+                    </td>
+                  </tr>
+                  {document.paid_total > 0 && (
+                    <>
+                      <tr className="bg-green-50">
+                        <td className="border-r border-slate-300 p-2 text-green-700">Payé / Betaald</td>
+                        <td className="p-2 text-right font-mono text-green-700">
+                          €{(document.paid_total || 0).toFixed(2)}
+                        </td>
+                      </tr>
+                      {(document.total - document.paid_total) > 0.01 && (
+                        <tr className="bg-amber-50">
+                          <td className="border-r border-slate-300 p-2 font-semibold text-amber-700">
+                            Reste à payer / Rest te betalen
+                          </td>
+                          <td className="p-2 text-right font-mono font-semibold text-amber-700">
+                            €{((document.total || 0) - (document.paid_total || 0)).toFixed(2)}
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
 
           {/* Payment History */}
           {document.payments?.length > 0 && (
-            <div className="mb-8">
-              <div className="text-xs font-semibold text-slate-600 mb-2">PAIEMENTS / BETALINGEN</div>
-              <div className="bg-slate-50 rounded-lg border border-slate-200 p-3">
+            <div className="mb-8 border-t border-slate-300 pt-4">
+              <div className="text-xs font-semibold text-slate-700 mb-2">HISTORIQUE DES PAIEMENTS / BETALINGSGESCHIEDENIS</div>
+              <div className="space-y-1">
                 {document.payments.map((payment, idx) => (
-                  <div key={idx} className="flex justify-between items-center text-xs mb-1 last:mb-0">
+                  <div key={idx} className="flex justify-between items-center text-xs bg-slate-50 p-2 rounded">
                     <div className="flex items-center gap-2">
                       <CreditCard className="w-3 h-3 text-slate-500" />
-                      <span className="text-slate-600">
-                        {new Date(payment.created_at).toLocaleDateString('fr-BE')} - {payment.method === 'cash' ? 'Espèces' : payment.method === 'card' ? 'Carte' : 'Virement'}
+                      <span>
+                        {new Date(payment.created_at).toLocaleDateString('fr-BE')} - {' '}
+                        {payment.method === 'cash' ? 'Espèces / Cash' : payment.method === 'card' ? 'Carte / Kaart' : 'Virement / Overschrijving'}
                       </span>
                     </div>
-                    <span className="font-mono font-medium">€{payment.amount.toFixed(2)}</span>
+                    <span className="font-mono font-semibold">€{payment.amount.toFixed(2)}</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Footer */}
-          <div className="border-t border-slate-300 pt-6 mt-12">
-            <div className="text-xs text-slate-600 space-y-2">
-              <div className="flex justify-between">
-                <div>
-                  <div className="font-medium mb-1">Coordonnées bancaires / Bankgegevens:</div>
+          {/* Footer: Payment Info + Legal */}
+          <div className="border-t-2 border-slate-300 pt-4 mt-12">
+            <div className="grid grid-cols-3 gap-4 text-xs mb-4">
+              {/* KBC */}
+              <div>
+                <div className="font-bold text-brand-navy mb-1">KBC</div>
+                <div className="text-slate-600">
                   <div>IBAN: BE68 5390 0754 7034</div>
-                  <div>BIC: BBRUBEBB</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-medium mb-1">Conditions de paiement:</div>
-                  <div>Paiement à {document.payment_terms || '30'} jours</div>
+                  <div>BIC: KRED BE BB</div>
                 </div>
               </div>
               
-              <div className="text-center text-slate-500 text-xs pt-4 border-t border-slate-200">
-                <div className="font-medium">Merci pour votre confiance / Bedankt voor uw vertrouwen</div>
-                <div className="mt-1">ALPHA&CO BVBA - TVA BE 1028.386.674 - RPM Bruxelles</div>
+              {/* Belfius */}
+              <div>
+                <div className="font-bold text-brand-navy mb-1">Belfius</div>
+                <div className="text-slate-600">
+                  <div>IBAN: BE68 5390 0754 7034</div>
+                  <div>BIC: GKCC BE BB</div>
+                </div>
               </div>
+              
+              {/* BNP Paribas Fortis */}
+              <div>
+                <div className="font-bold text-brand-navy mb-1">BNP Paribas Fortis</div>
+                <div className="text-slate-600">
+                  <div>IBAN: BE68 5390 0754 7034</div>
+                  <div>BIC: GEBABEBB</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Legal Note */}
+            <div className="text-center text-xs text-slate-500 pt-3 border-t border-slate-200">
+              <p>Les paiements par carte sont au taux négocié avec votre banque au jour de la transaction. Les chèques ne sont pas acceptés.</p>
+              <p className="mt-1">Tous différends relèvent uniquement de la compétence des tribunaux de Bruxelles.</p>
+              <p className="mt-2 font-semibold">ALPHA&CO BVBA - TVA BE 1028.386.674 - RPM Bruxelles</p>
             </div>
           </div>
         </div>
@@ -291,6 +386,7 @@ export default function DocumentViewer({ document }) {
           .document-viewer {
             margin: 0;
             padding: 0;
+            background: white;
           }
           .document-viewer > div {
             box-shadow: none;
