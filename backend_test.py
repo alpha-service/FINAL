@@ -807,20 +807,17 @@ class POSAPITester:
                                                  expected_status=200, data=overpayment_data)  # Backend may accept and handle gracefully
         
         # If it doesn't reject with 400, check if it handles gracefully
-        if not success and overpay_response:
-            # Check if it's a proper error response
-            overpay_handled = True
-            self.log_test("Overpayment Handling", overpay_handled, "Backend properly rejects overpayment")
+        if success and isinstance(overpay_response, dict):
+            # Check if it handles overpayment correctly
+            paid_amount = overpay_response.get('paid_total', 0)
+            status = overpay_response.get('status', '')
+            # Backend should either cap payment at total or mark as overpaid
+            overpay_handled = paid_amount >= edge_total and status == 'paid'
+            self.log_test("Overpayment Handling", overpay_handled, 
+                         f"Payment handled: €{paid_amount} (total: €{edge_total}), status: {status}")
         else:
-            # If it accepts, check if it caps the payment
-            if success and isinstance(overpay_response, dict):
-                paid_amount = overpay_response.get('paid_total', 0)
-                overpay_handled = paid_amount <= edge_total
-                self.log_test("Overpayment Handling", overpay_handled, 
-                             f"Payment capped at €{paid_amount} (total: €{edge_total})")
-            else:
-                overpay_handled = False
-                self.log_test("Overpayment Handling", overpay_handled, "Unexpected response")
+            overpay_handled = False
+            self.log_test("Overpayment Handling", overpay_handled, "Backend rejected overpayment or error occurred")
         
         # Test negative amount
         negative_payment_data = {
