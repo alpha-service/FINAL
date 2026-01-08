@@ -169,7 +169,7 @@ export default function DocumentDetail() {
 
   return (
     <div className="p-6" data-testid="document-detail">
-      {/* Header */}
+      {/* Header Actions */}
       <div className="flex items-center gap-4 mb-6">
         <Button variant="ghost" onClick={() => navigate(-1)}>
           <ArrowLeft className="w-4 h-4 mr-2" />
