@@ -1,0 +1,178 @@
+{
+  "identity": {
+    "persona": "E1",
+    "style": "Industrial Functionalism",
+    "principles": [
+      "Fusion over Imitation: Industrial ruggedness meets Swiss precision",
+      "Emotion First: Trust, Efficiency, and Durability",
+      "Content is King: Product data and price must be instantly readable",
+      "Zoom In: High fidelity product images",
+      "Negative Space: Used for grouping, not just emptiness",
+      "Contrast: High contrast for readability in warehouse lighting"
+    ]
+  },
+  "typography": {
+    "fonts": {
+      "headings": {
+        "family": "Montserrat, sans-serif",
+        "weights": ["600", "700", "800"],
+        "usage": "Page titles, Product names, Total prices",
+        "letterSpacing": "tracking-tight"
+      },
+      "body": {
+        "family": "Inter, sans-serif",
+        "weights": ["400", "500"],
+        "usage": "Descriptions, metadata, inputs",
+        "letterSpacing": "tracking-normal"
+      }
+    },
+    "scale": {
+      "h1": "text-3xl md:text-4xl font-bold tracking-tight",
+      "h2": "text-2xl font-bold tracking-tight",
+      "h3": "text-xl font-semibold",
+      "body": "text-base leading-relaxed",
+      "small": "text-sm font-medium text-muted-foreground",
+      "price": "text-lg font-mono font-bold text-primary"
+    }
+  },
+  "colors": {
+    "palette": {
+      "primary": {
+        "DEFAULT": "#1a365d",
+        "foreground": "#ffffff",
+        "description": "Navy Blue - Trust, Professionalism"
+      },
+      "secondary": {
+        "DEFAULT": "#f1f5f9",
+        "foreground": "#1a365d",
+        "description": "Slate 100 - Secondary actions"
+      },
+      "accent": {
+        "DEFAULT": "#ff6b35",
+        "foreground": "#ffffff",
+        "description": "Safety Orange - Call to Actions, Highlights"
+      },
+      "background": "#f7fafc",
+      "surface": "#ffffff",
+      "muted": "#94a3b8",
+      "border": "#e2e8f0",
+      "success": "#10b981",
+      "warning": "#f59e0b",
+      "error": "#ef4444"
+    },
+    "theme_strategy": "light",
+    "tailwind_config_extension": {
+      "colors": {
+        "brand": {
+          "navy": "#1a365d",
+          "orange": "#ff6b35",
+          "gray": "#f7fafc"
+        }
+      }
+    }
+  },
+  "layout": {
+    "grid_system": "Control Room Grid (Mode B)",
+    "structure": {
+      "container": "w-full h-screen overflow-hidden bg-background flex",
+      "sidebar": "w-20 lg:w-64 flex-shrink-0 border-r bg-surface hidden md:flex flex-col",
+      "main_content": "flex-1 flex flex-col h-full overflow-hidden",
+      "product_grid": "flex-1 overflow-y-auto p-4 md:p-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4",
+      "cart_panel": "w-full md:w-80 lg:w-96 border-l bg-surface flex flex-col h-full shadow-xl z-20"
+    },
+    "spacing": {
+      "base": "p-4",
+      "card_padding": "p-4",
+      "section_gap": "gap-6"
+    }
+  },
+  "components": {
+    "ProductCard": {
+      "style": "bg-white border border-border rounded-lg overflow-hidden hover:border-brand-navy/50 transition-colors group relative",
+      "image_aspect": "aspect-square object-cover w-full bg-gray-100",
+      "content_padding": "p-4",
+      "interaction": "Click to add to cart, ripple effect"
+    },
+    "CartItem": {
+      "style": "flex items-center gap-3 p-3 border-b border-border last:border-0",
+      "controls": "flex items-center gap-2 bg-secondary rounded-md p-1"
+    },
+    "Button": {
+      "primary": "bg-brand-navy hover:bg-brand-navy/90 text-white font-bold rounded-md shadow-sm",
+      "accent": "bg-brand-orange hover:bg-brand-orange/90 text-white font-bold rounded-md shadow-sm",
+      "outline": "border-2 border-brand-navy text-brand-navy hover:bg-brand-navy/5 font-bold rounded-md"
+    },
+    "Input": {
+      "style": "h-12 bg-white border-input focus:ring-2 focus:ring-brand-navy/20 rounded-md text-lg"
+    }
+  },
+  "visual_enhancers": {
+    "shadows": "shadow-sm for cards, shadow-xl for floating cart",
+    "borders": "1px solid #e2e8f0 (slate-200)",
+    "radius": "rounded-lg (0.5rem)",
+    "textures": "Subtle noise on sidebar background (optional)"
+  },
+  "images": {
+    "products": [
+      {
+        "url": "https://images.unsplash.com/photo-1755943807913-5f999c562f45?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njl8MHwxfHNlYXJjaHwxfHxidWlsZGluZyUyMG1hdGVyaWFscyUyMGNvbnN0cnVjdGlvbiUyMHRvb2xzfGVufDB8fHx8MTc2Nzg0NTY5NHww&ixlib=rb-4.1.0&q=85",
+        "category": "construction",
+        "alt": "Scaffolding and pipes"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1765808376054-e224c7dbcdee?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njl8MHwxfHNlYXJjaHwyfHxidWlsZGluZyUyMG1hdGVyaWFscyUyMGNvbnN0cnVjdGlvbiUyMHRvb2xzfGVufDB8fHx8MTc2Nzg0NTY5NHww&ixlib=rb-4.1.0&q=85",
+        "category": "roofing",
+        "alt": "Roof construction"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1765277789236-18b14cb7869f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njl8MHwxfHNlYXJjaHwzfHxidWlsZGluZyUyMG1hdGVyaWFscyUyMGNvbnN0cnVjdGlvbiUyMHRvb2xzfGVufDB8fHx8MTc2Nzg0NTY5NHww&ixlib=rb-4.1.0&q=85",
+        "category": "interior",
+        "alt": "Renovation tools"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1692889373992-febd93ea5f22?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njl8MHwxfHNlYXJjaHw0fHxidWlsZGluZyUyMG1hdGVyaWFscyUyMGNvbnN0cnVjdGlvbiUyMHRvb2xzfGVufDB8fHx8MTc2Nzg0NTY5NHww&ixlib=rb-4.1.0&q=85",
+        "category": "machinery",
+        "alt": "Bulldozer"
+      },
+      {
+        "url": "https://images.pexels.com/photos/364984/pexels-photo-364984.jpeg",
+        "category": "tools",
+        "alt": "Hand tools"
+      },
+      {
+        "url": "https://images.pexels.com/photos/5691682/pexels-photo-5691682.jpeg",
+        "category": "materials",
+        "alt": "Wood planks"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "1. SETUP: Install 'lucide-react' for icons. Configure Tailwind with the brand colors defined in 'colors' section.",
+    "2. LAYOUT: Create a responsive layout. On Mobile: Cart is a drawer/sheet. On Tablet/Desktop: Cart is a sticky right sidebar.",
+    "3. COMPONENTS: Use Shadcn UI for complex interactions (Dialog, Select, Toast). Customize them to match the 'Industrial' aesthetic (square corners, thick borders).",
+    "4. STATE: Use a simple local state or context for the Cart (items, total, tax).",
+    "5. FEATURES: Implement Product Search (filter by name/sku), Category Tabs, and PDF Generation (mock function or use 'jspdf').",
+    "6. DATA: Create a mock product database using the provided image URLs.",
+    "7. ACCESSIBILITY: Ensure all buttons have aria-labels and high contrast focus states."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy",
+    "Use glass-morphism effects with backdrop filters (12-24px blur)",
+    "You MUST NOT apply universal transition. Eg: transition: all. This results in breaking transforms. Always add transitions for specific interactive elements like button, input excluding transforms",
+    "You MUST NOT center align the app container, ie do not add .App { text-align: center; } in the css file. This disrupts the human natural reading flow of text",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style",
+    "NEVER: use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯📚🎭🎬🎪🎉🎊🎁🎀🎂🍰🎈🎨🎰💰💵💳🏦💎🪙💸🤑📊📈📉💹🔢🏆🥇 etc for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, parallax effects, and entrance animations. Static = dead.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Subtle grain textures, noise overlays, custom cursors, selection states, and loading animations: separates good from extraordinary.",
+    "Main agent relies on these image URLs. Missing categories (especially sponsor logos) = main agent will use placeholder text which is FORBIDDEN",
+    "Prioritize using pre-existing components from src/components/ui when applicable",
+    "Create new components that match the style and conventions of existing components when needed",
+    "Examine existing components to understand the project's component patterns before creating new ones",
+    "Components MUST use named exports (export const ComponentName = ...)",
+    "Pages MUST use default exports (export default function PageName() {...})",
+    "Use 'sonner' for toasts. Sonner component are located in /app/src/components/ui/sonner.tsx"
+  ]
+}
