@@ -1,34 +1,153 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* ALPHA&CO POS Custom Styles */
+
+/* Product card hover effect */
+.product-card {
+    transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+.product-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px -5px rgba(26, 54, 93, 0.15);
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+.product-card:active {
+    transform: translateY(0);
 }
 
-.App-link {
-    color: #61dafb;
+/* Cart item animations */
+.cart-item {
+    animation: slideIn 0.2s ease-out;
 }
 
-@keyframes App-logo-spin {
+@keyframes slideIn {
     from {
-        transform: rotate(0deg);
+        opacity: 0;
+        transform: translateX(20px);
     }
     to {
-        transform: rotate(360deg);
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Category tab active state */
+.category-tab {
+    position: relative;
+    transition: color 0.2s ease-out;
+}
+
+.category-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: #ff6b35;
+    border-radius: 2px 2px 0 0;
+}
+
+/* Payment button pulse */
+.pay-button {
+    position: relative;
+    overflow: hidden;
+}
+
+.pay-button::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.3s ease-out, height 0.3s ease-out;
+}
+
+.pay-button:active::after {
+    width: 200px;
+    height: 200px;
+}
+
+/* Quantity controls */
+.qty-btn {
+    transition: background-color 0.15s ease-out, transform 0.1s ease-out;
+}
+
+.qty-btn:active {
+    transform: scale(0.9);
+}
+
+/* Toast animations */
+.toast-enter {
+    animation: toastIn 0.3s ease-out;
+}
+
+@keyframes toastIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Search input focus */
+.search-input:focus {
+    box-shadow: 0 0 0 3px rgba(26, 54, 93, 0.15);
+}
+
+/* Smooth scrolling for product grid */
+.product-grid {
+    scroll-behavior: smooth;
+}
+
+/* Price styling */
+.price-tag {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+/* Skeleton loading */
+.skeleton {
+    background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s infinite;
+}
+
+@keyframes skeleton-loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Mobile cart drawer */
+@media (max-width: 768px) {
+    .cart-drawer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        max-height: 80vh;
+        border-radius: 20px 20px 0 0;
+        box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.15);
+    }
+}
+
+/* Print styles */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    .print-only {
+        display: block !important;
     }
 }
