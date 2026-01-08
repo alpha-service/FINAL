@@ -29,9 +29,108 @@ export default function Settings() {
   const [printerEnabled, setPrinterEnabled] = useState(false);
   const [scannerEnabled, setScannerEnabled] = useState(true);
   const [peppolEnabled, setPeppolEnabled] = useState(false);
+  
+  // Shopify state
+  const [shopifySettings, setShopifySettings] = useState(null);
+  const [shopifyLoading, setShopifyLoading] = useState(true);
+  const [syncLogs, setSyncLogs] = useState([]);
+  const [unmappedProducts, setUnmappedProducts] = useState([]);
+  const [showSyncLogs, setShowSyncLogs] = useState(false);
+
+  useEffect(() => {
+    loadShopifySettings();
+    loadSyncLogs();
+    loadUnmappedProducts();
+  }, []);
+
+  const loadShopifySettings = async () => {
+    try {
+      const response = await axios.get(`${API}/shopify/settings`);
+      setShopifySettings(response.data);
+    } catch (error) {
+      console.error("Error loading Shopify settings:", error);
+    } finally {
+      setShopifyLoading(false);
+    }
+  };
+
+  const loadSyncLogs = async () => {
+    try {
+      const response = await axios.get(`${API}/shopify/sync-logs?limit=10`);
+      setSyncLogs(response.data);
+    } catch (error) {
+      console.error("Error loading sync logs:", error);
+    }
+  };
+
+  const loadUnmappedProducts = async () => {
+    try {
+      const response = await axios.get(`${API}/shopify/unmapped-products`);
+      setUnmappedProducts(response.data);
+    } catch (error) {
+      console.error("Error loading unmapped products:", error);
+    }
+  };
+
+  const handleShopifySettingsChange = (field, value) => {
+    setShopifySettings(prev => ({ ...prev, [field]: value }));
+  };
+
+  const saveShopifySettings = async () => {
+    try {
+      await axios.post(`${API}/shopify/settings`, shopifySettings);
+      toast.success("Paramètres Shopify sauvegardés");
+      loadShopifySettings();
+    } catch (error) {
+      toast.error("Erreur lors de la sauvegarde");
+    }
+  };
+
+  const handleSyncProducts = async () => {
+    toast.info("Synchronisation des produits...");
+    try {
+      await axios.post(`${API}/shopify/sync/products`);
+      toast.success("Produits importés avec succès");
+      loadSyncLogs();
+      loadUnmappedProducts();
+    } catch (error) {
+      toast.error("Erreur lors de l'import");
+    }
+  };
+
+  const handleSyncStock = async () => {
+    toast.info("Synchronisation du stock...");
+    try {
+      const response = await axios.post(`${API}/shopify/sync/stock`);
+      toast.success(`Stock synchronisé: ${response.data.items_synced} produits`);
+      loadSyncLogs();
+    } catch (error) {
+      toast.error("Erreur lors de la synchro stock");
+    }
+  };
+
+  const handleSyncOrders = async () => {
+    toast.info("Import des commandes...");
+    try {
+      await axios.post(`${API}/shopify/sync/orders`);
+      toast.success("Commandes importées");
+      loadSyncLogs();
+    } catch (error) {
+      toast.error("Erreur lors de l'import");
+    }
+  };
 
   const handleSave = () => {
     toast.success("Paramètres sauvegardés");
+  };
+
+  const getSyncStatusIcon = (status) => {
+    switch (status) {
+      case "success": return <CheckCircle className="w-4 h-4 text-green-600" />;
+      case "failed": return <XCircle className="w-4 h-4 text-red-600" />;
+      case "pending": return <Clock className="w-4 h-4 text-amber-600" />;
+      default: return <AlertTriangle className="w-4 h-4 text-gray-600" />;
+    }
   };
 
   return (
