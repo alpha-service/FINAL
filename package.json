@@ -1,0 +1,37 @@
+{
+  "name": "alphaco-pos-system",
+  "version": "1.0.0",
+  "description": "ALPHA&CO POS System - Full-stack Point of Sale application",
+  "private": true,
+  "scripts": {
+    "install:all": "cd backend && pip install -r requirements.txt && cd ../frontend && yarn install",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && uvicorn server:app --reload --host 0.0.0.0 --port 8001",
+    "dev:frontend": "cd frontend && yarn start",
+    "build": "cd frontend && yarn build",
+    "test": "cd frontend && yarn test",
+    "lint:frontend": "cd frontend && yarn lint",
+    "format": "cd frontend && yarn format"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/alphaco-pos"
+  },
+  "keywords": [
+    "pos",
+    "point-of-sale",
+    "inventory",
+    "react",
+    "fastapi",
+    "mongodb"
+  ],
+  "author": "ALPHA&CO",
+  "license": "MIT"
+}
