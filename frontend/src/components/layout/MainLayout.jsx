@@ -66,11 +66,6 @@ export default function MainLayout() {
     }
   };
 
-  // Full screen for POS
-  if (location.pathname === "/pos") {
-    return <Outlet />;
-  }
-
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Mobile sidebar toggle */}
