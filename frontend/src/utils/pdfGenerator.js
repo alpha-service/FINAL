@@ -125,7 +125,7 @@ export const generateReceiptPDF = (sale, customer = null) => {
     ];
   });
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: y,
     head: [[
       "SKU",
