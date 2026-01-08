@@ -381,14 +381,13 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Devis Button in POS Cart"
-    - "Devis Creation from POS"
-    - "Sales History Enhanced Filters"
-    - "Sales History Canal Column"
-    - "Document Detail Page Enhancement"
-    - "Quote to Invoice Conversion"
-    - "Documents Hub Tabs"
-  stuck_tasks: []
+    - "Document Creation API"
+    - "Document Detail Endpoint" 
+    - "PDF Download Endpoint"
+    - "Partial Payment Flow"
+    - "Payment Edge Cases"
+  stuck_tasks:
+    - "Payment Edge Cases"
   test_all: false
   test_priority: "high_first"
 
@@ -403,3 +402,5 @@ agent_communication:
       message: "✅ DOCUMENT PDF GENERATION AND NAVIGATION TESTING COMPLETED: All backend document APIs are working perfectly. Successfully tested: 1) Document creation (quote with DV prefix), 2) Document detail endpoint returning complete data structure with items, totals, customer info, 3) PDF generation endpoint returning valid PDF binary with correct content-type and filename headers, 4) All monetary calculations are accurate. Created test document DV260108-003 with 2 items, verified PDF generation (2222 bytes, valid PDF format), and confirmed all required fields in API responses."
     - agent: "testing"
       message: "✅ DOCUMENT PDF DOWNLOAD AND NAVIGATION TESTING COMPLETED: Successfully tested all document navigation and PDF download functionality. 1) Eye icon navigation from Documents Hub to Document Detail works perfectly, 2) Document Detail page displays all required sections (customer info, items table with correct columns, totals, action buttons), 3) PDF download API endpoint working (verified 2222 bytes PDF file generation), 4) All UI components and navigation flows are functional. Documents Hub shows 6 documents, proper table structure with Eye and Download icons in Actions column."
+    - agent: "testing"
+      message: "✅ COMPREHENSIVE DOCUMENT WORKFLOW TESTING COMPLETED: Tested complete backend document workflow as requested. 1) Document Creation: Successfully created quote (~€50) and invoice (~€100) with proper number prefixes (DV/FA) and totals calculation. 2) Document Detail: Verified complete API response structure including items array, totals, customer info, payments array. 3) PDF Download: Confirmed valid PDF generation with correct HTTP headers, content-type, and binary format. 4) Partial Payments: Verified status transitions (unpaid → partially_paid → paid) and payment accumulation. 5) Edge Cases: Overpayment handling works, but found validation bug - backend accepts negative payment amounts which should be rejected. Overall: 26/27 tests passed - excellent backend API functionality with one validation issue to fix."
