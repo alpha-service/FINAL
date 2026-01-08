@@ -194,6 +194,50 @@ export default function POSScreen() {
     }
   };
 
+  // Save cart as Devis (Quote) - NO stock impact
+  const handleSaveAsDevis = async () => {
+    if (cart.length === 0) {
+      toast.error("Panier vide");
+      return;
+    }
+
+    try {
+      const devisData = {
+        doc_type: "quote",
+        customer_id: selectedCustomer?.id || null,
+        items: cart.map(item => ({
+          product_id: item.product_id,
+          sku: item.sku,
+          name: item.name,
+          qty: item.qty,
+          unit_price: item.unit_price,
+          discount_type: item.discount_type,
+          discount_value: item.discount_value,
+          vat_rate: item.vat_rate
+        })),
+        payments: [], // No payments for quote
+        global_discount_type: globalDiscount.type,
+        global_discount_value: globalDiscount.value
+      };
+
+      const response = await axios.post(`${API}/documents`, devisData);
+      const devis = response.data;
+
+      toast.success(`Devis ${devis.number} créé!`, { duration: 3000 });
+
+      // Reset state
+      setCart([]);
+      setSelectedCustomer(null);
+      setGlobalDiscount({ type: null, value: 0 });
+
+      // Navigate to document detail
+      navigate(`/documents/${devis.id}`);
+    } catch (error) {
+      toast.error("Erreur lors de la création du devis");
+      console.error(error);
+    }
+  };
+
   // Clear cart
   const clearCart = () => {
     setCart([]);
