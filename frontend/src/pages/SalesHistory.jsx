@@ -49,6 +49,9 @@ export default function SalesHistory() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState("all");
+  const [channelFilter, setChannelFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [showReturnDialog, setShowReturnDialog] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
   const [returnItems, setReturnItems] = useState([]);
