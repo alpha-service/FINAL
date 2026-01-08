@@ -399,6 +399,15 @@ export default function SalesHistory() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => handleReorder(sale)}
+                          title="Recommander"
+                          className="text-brand-orange hover:text-brand-orange/80"
+                        >
+                          <ShoppingCart className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => window.print()}
                           title="Imprimer"
                         >
