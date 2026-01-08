@@ -506,14 +506,23 @@ class POSAPITester:
 
 def main():
     """Main test runner"""
+    import sys
+    
+    # Check if we should run document-specific tests
+    run_document_tests = len(sys.argv) > 1 and sys.argv[1] == "documents"
+    
     tester = POSAPITester()
     
     try:
-        success = tester.run_all_tests()
+        if run_document_tests:
+            success = tester.run_document_tests()
+        else:
+            success = tester.run_all_tests()
         
         # Save detailed results
         results = {
             "timestamp": datetime.now().isoformat(),
+            "test_type": "document_tests" if run_document_tests else "full_tests",
             "summary": {
                 "total_tests": tester.tests_run,
                 "passed_tests": tester.tests_passed,
@@ -524,11 +533,17 @@ def main():
             "sample_data": {
                 "categories_count": len(tester.sample_data.get('categories', [])),
                 "products_count": len(tester.sample_data.get('products', [])),
-                "customers_count": len(tester.sample_data.get('customers', []))
+                "customers_count": len(tester.sample_data.get('customers', [])),
+                "document_created": bool(tester.sample_data.get('document'))
             }
         }
         
-        with open('/app/test_reports/backend_api_results.json', 'w') as f:
+        # Create test_reports directory if it doesn't exist
+        import os
+        os.makedirs('/app/test_reports', exist_ok=True)
+        
+        filename = 'document_api_results.json' if run_document_tests else 'backend_api_results.json'
+        with open(f'/app/test_reports/{filename}', 'w') as f:
             json.dump(results, f, indent=2)
         
         return 0 if success else 1
