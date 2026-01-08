@@ -113,8 +113,35 @@ export default function DocumentDetail() {
     }
   };
 
-  const handlePrint = () => {
-    generateReceiptPDF(document, null);
+  const handlePrint = async () => {
+    try {
+      const response = await fetch(`${API}/documents/${docId}/pdf`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      
+      // Open in new tab
+      window.open(url, '_blank');
+      
+      // Also trigger download
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${document.number}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      setTimeout(() => window.URL.revokeObjectURL(url), 100);
+      
+      toast.success("PDF généré");
+    } catch (error) {
+      console.error("PDF generation error:", error);
+      toast.error("Erreur lors de la génération du PDF");
+    }
   };
 
   if (loading) {
