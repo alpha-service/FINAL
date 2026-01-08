@@ -1,0 +1,206 @@
+{
+  "timestamp": "2026-01-08T06:32:38.446833",
+  "test_type": "workflow",
+  "summary": {
+    "total_tests": 27,
+    "passed_tests": 24,
+    "failed_tests": 3,
+    "success_rate": "88.9%"
+  },
+  "test_results": [
+    {
+      "test_name": "API Root",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Get Products",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Products Structure",
+      "success": true,
+      "details": "Found 50 products with required fields",
+      "response_data": null
+    },
+    {
+      "test_name": "Get Customers",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Customers Structure",
+      "success": true,
+      "details": "Found 10 customers with required fields",
+      "response_data": null
+    },
+    {
+      "test_name": "Create Test Quote",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Quote Total Calculation",
+      "success": true,
+      "details": "Expected ~\u20ac50, got \u20ac48.4",
+      "response_data": null
+    },
+    {
+      "test_name": "Create Test Invoice",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Invoice Total Calculation",
+      "success": true,
+      "details": "Expected ~\u20ac100, got \u20ac102.85",
+      "response_data": null
+    },
+    {
+      "test_name": "Get Quote Detail",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Quote Detail Structure",
+      "success": true,
+      "details": "Quote DV260108-004 structure check",
+      "response_data": null
+    },
+    {
+      "test_name": "Get Invoice Detail",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Invoice Detail Structure",
+      "success": true,
+      "details": "Invoice FA260108-002 structure check",
+      "response_data": null
+    },
+    {
+      "test_name": "PDF Download (Quote)",
+      "success": true,
+      "details": "Status: 200, Content-Type: application/pdf, Size: 2213 bytes",
+      "response_data": null
+    },
+    {
+      "test_name": "PDF Download (Invoice)",
+      "success": true,
+      "details": "Status: 200, Content-Type: application/pdf, Size: 2347 bytes",
+      "response_data": null
+    },
+    {
+      "test_name": "Get Initial Invoice State",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Initial Invoice State",
+      "success": true,
+      "details": "Status: unpaid, Paid: \u20ac0.0, Total: \u20ac102.85",
+      "response_data": null
+    },
+    {
+      "test_name": "Add First Partial Payment",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "First Partial Payment",
+      "success": true,
+      "details": "Status: partially_paid, Paid: \u20ac30.85, Payments: 1",
+      "response_data": null
+    },
+    {
+      "test_name": "Add Second Payment (Complete)",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Second Payment (Complete)",
+      "success": false,
+      "details": "Status: partially_paid, Paid: \u20ac102.84, Payments: 2",
+      "response_data": null
+    },
+    {
+      "test_name": "Payment Methods Recorded",
+      "success": true,
+      "details": "Methods: ['cash', 'card']",
+      "response_data": null
+    },
+    {
+      "test_name": "Create Edge Case Invoice",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Test Overpayment",
+      "success": false,
+      "details": "Status: 422 (expected 400)",
+      "response_data": {
+        "detail": [
+          {
+            "type": "missing",
+            "loc": [
+              "body"
+            ],
+            "msg": "Field required",
+            "input": null,
+            "url": "https://errors.pydantic.dev/2.12/v/missing"
+          }
+        ]
+      }
+    },
+    {
+      "test_name": "Overpayment Handling",
+      "success": true,
+      "details": "Backend properly rejects overpayment",
+      "response_data": null
+    },
+    {
+      "test_name": "Test Negative Payment",
+      "success": false,
+      "details": "Status: 422 (expected 400)",
+      "response_data": {
+        "detail": [
+          {
+            "type": "missing",
+            "loc": [
+              "body"
+            ],
+            "msg": "Field required",
+            "input": null,
+            "url": "https://errors.pydantic.dev/2.12/v/missing"
+          }
+        ]
+      }
+    },
+    {
+      "test_name": "Negative Payment Rejection",
+      "success": true,
+      "details": "Backend properly rejects negative amounts",
+      "response_data": null
+    }
+  ],
+  "sample_data": {
+    "categories_count": 0,
+    "products_count": 50,
+    "customers_count": 10,
+    "document_created": false,
+    "test_quote_created": true,
+    "test_invoice_created": true
+  }
+}
