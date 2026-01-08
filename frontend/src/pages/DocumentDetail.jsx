@@ -120,9 +120,22 @@ export default function DocumentDetail() {
       
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
+      
+      // Format filename: FACTURE_260107-010.pdf
+      const docTypePrefix = {
+        'quote': 'DEVIS',
+        'invoice': 'FACTURE',
+        'receipt': 'TICKET',
+        'credit_note': 'CREDIT',
+        'proforma': 'PROFORMA',
+        'delivery_note': 'LIVRAISON'
+      };
+      const prefix = docTypePrefix[document.doc_type] || 'DOCUMENT';
+      const filename = `${prefix}_${document.number}.pdf`;
+      
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${document.number}.pdf`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
