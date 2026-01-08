@@ -41,15 +41,32 @@ export default function PaymentModal({ open, onClose, total, onPaymentComplete }
   };
 
   const handleComplete = () => {
-    // If no payments added yet, add the full amount
-    let finalPayments = payments;
-    if (payments.length === 0 && remaining > 0) {
+    // If no payments added yet, add the full amount (or tendered amount for cash)
+    let finalPayments = [...payments];
+    const amountToAdd = selectedMethod === "cash" && parseFloat(amountTendered) > 0 
+      ? Math.min(parseFloat(amountTendered), remaining) 
+      : remaining;
+    
+    if (finalPayments.length === 0 || (remaining > 0 && amountToAdd > 0)) {
+      const paymentAmount = remaining > 0 ? amountToAdd : total;
+      if (paymentAmount > 0) {
+        finalPayments.push({
+          method: selectedMethod,
+          amount: paymentAmount,
+          reference: null
+        });
+      }
+    }
+    
+    // Ensure we always have at least one payment
+    if (finalPayments.length === 0) {
       finalPayments = [{
         method: selectedMethod,
-        amount: remaining,
+        amount: total,
         reference: null
       }];
     }
+    
     onPaymentComplete(finalPayments);
     resetState();
   };
