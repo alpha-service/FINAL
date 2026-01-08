@@ -197,6 +197,14 @@ export default function DocumentDetail() {
             <Copy className="w-4 h-4 mr-2" />
             Dupliquer
           </Button>
+          <Button variant="outline" onClick={handleDownloadPDF}>
+            <Download className="w-4 h-4 mr-2" />
+            PDF
+          </Button>
+          <Button variant="outline" onClick={handleOpenPDFNewTab}>
+            <ExternalLink className="w-4 h-4 mr-2" />
+            Ouvrir PDF
+          </Button>
           {document.doc_type === "quote" && document.status !== "accepted" && (
             <Button variant="outline" onClick={handleConvert}>
               <ArrowRight className="w-4 h-4 mr-2" />
