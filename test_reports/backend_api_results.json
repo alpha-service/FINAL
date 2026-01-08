@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-01-08T04:24:01.065394",
+  "timestamp": "2026-01-08T04:35:23.997550",
   "summary": {
     "total_tests": 20,
     "passed_tests": 19,
@@ -114,8 +114,8 @@
       "success": false,
       "details": "Status: 200 (expected 201)",
       "response_data": {
-        "id": "f09af11d-c98c-4f47-afc2-316d73f77804",
-        "number": "260108-001",
+        "id": "fe3dccca-439e-4712-aede-2205ac23727c",
+        "number": "260108-007",
         "status": "paid",
         "customer_id": "c001",
         "customer_name": "Jean Dupont",
@@ -129,7 +129,7 @@
             "discount_type": null,
             "discount_value": 0.0,
             "vat_rate": 21.0,
-            "id": "db33e8fa-b3e0-4074-93b0-03c9d9009016",
+            "id": "9ab3bcdb-c2b8-4840-907a-d378735397bc",
             "line_total": 10.89
           }
         ],
@@ -138,8 +138,8 @@
             "method": "cash",
             "amount": 10.89,
             "reference": null,
-            "id": "86007ade-97ed-4e89-8a95-84154dfdbe2b",
-            "created_at": "2026-01-08T04:24:00.956523+00:00"
+            "id": "f59301de-9e52-43a0-9098-1e3063f04645",
+            "created_at": "2026-01-08T04:35:23.956027+00:00"
           }
         ],
         "subtotal": 9.0,
@@ -149,7 +149,7 @@
         "global_discount_type": null,
         "global_discount_value": 0.0,
         "created_by": null,
-        "created_at": "2026-01-08T04:24:00.957197+00:00"
+        "created_at": "2026-01-08T04:35:23.956622+00:00"
       }
     },
     {
@@ -161,7 +161,7 @@
     {
       "test_name": "Sales List",
       "success": true,
-      "details": "Found 1 sales",
+      "details": "Found 7 sales",
       "response_data": null
     }
   ],
