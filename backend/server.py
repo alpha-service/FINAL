@@ -745,6 +745,10 @@ async def add_payment(doc_id: str, payment: PaymentCreate):
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     
+    # Validate payment amount
+    if payment.amount <= 0:
+        raise HTTPException(status_code=400, detail="Payment amount must be positive")
+    
     shift = await get_current_shift()
     
     new_payment = Payment(
@@ -754,7 +758,8 @@ async def add_payment(doc_id: str, payment: PaymentCreate):
     )
     
     new_paid_total = doc.get("paid_total", 0) + payment.amount
-    new_status = DocumentStatus.PAID if new_paid_total >= doc["total"] else DocumentStatus.PARTIALLY_PAID
+    # Use small epsilon for floating-point comparison
+    new_status = DocumentStatus.PAID if new_paid_total >= (doc["total"] - 0.01) else DocumentStatus.PARTIALLY_PAID
     
     await db.documents.update_one(
         {"id": doc_id},
