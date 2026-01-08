@@ -72,6 +72,16 @@ class CashMovementType(str, Enum):
     SALE = "sale"
     REFUND = "refund"
 
+class ProductOrigin(str, Enum):
+    LOCAL = "local"
+    SHOPIFY = "shopify"
+
+class ShopifySyncStatus(str, Enum):
+    PENDING = "pending"
+    SUCCESS = "success"
+    FAILED = "failed"
+    MAPPING_REQUIRED = "mapping_required"
+
 # ============= MODELS =============
 class Category(BaseModel):
     model_config = ConfigDict(extra="ignore")
