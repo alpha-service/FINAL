@@ -264,6 +264,208 @@ class POSAPITester:
             return correct_customer
         return False
 
+    def test_document_creation(self):
+        """Test document creation (quote)"""
+        if not self.sample_data.get('products') or not self.sample_data.get('customers'):
+            self.log_test("Document Creation", False, "Missing products or customers for document test")
+            return False
+
+        # Create a test quote with multiple items and different VAT rates
+        product1 = self.sample_data['products'][0]
+        product2 = self.sample_data['products'][1] if len(self.sample_data['products']) > 1 else self.sample_data['products'][0]
+        customer = self.sample_data['customers'][0]
+        
+        document_data = {
+            "doc_type": "quote",
+            "customer_id": customer['id'],
+            "items": [
+                {
+                    "product_id": product1['id'],
+                    "sku": product1['sku'],
+                    "name": product1['name_fr'],
+                    "qty": 2.0,
+                    "unit_price": product1['price_retail'],
+                    "vat_rate": product1.get('vat_rate', 21.0)
+                },
+                {
+                    "product_id": product2['id'],
+                    "sku": product2['sku'],
+                    "name": product2['name_fr'],
+                    "qty": 1.5,
+                    "unit_price": product2['price_retail'],
+                    "vat_rate": product2.get('vat_rate', 21.0)
+                }
+            ],
+            "payments": [],
+            "notes": "Test quote for PDF generation"
+        }
+        
+        success, data = self.run_test("Create Document (Quote)", "POST", "documents", 200, document_data)
+        
+        if success and isinstance(data, dict):
+            required_fields = ['id', 'number', 'doc_type', 'status', 'total', 'items', 'subtotal', 'vat_total']
+            has_fields = all(field in data for field in required_fields)
+            
+            # Verify document type and number format
+            correct_type = data.get('doc_type') == 'quote'
+            correct_number_format = data.get('number', '').startswith('DV')
+            
+            self.log_test("Document Creation Structure", has_fields and correct_type and correct_number_format, 
+                         f"Quote created with number {data.get('number')}, total €{data.get('total')}" if has_fields else "Missing required fields or incorrect format")
+            
+            if has_fields and correct_type:
+                self.sample_data['document'] = data
+                return True
+        return False
+
+    def test_document_detail(self):
+        """Test document detail endpoint"""
+        if not self.sample_data.get('document'):
+            self.log_test("Document Detail", False, "No document available for detail test")
+            return False
+            
+        doc_id = self.sample_data['document']['id']
+        success, data = self.run_test("Get Document Detail", "GET", f"documents/{doc_id}")
+        
+        if success and isinstance(data, dict):
+            # Verify complete document structure
+            required_fields = ['id', 'number', 'doc_type', 'status', 'items', 'subtotal', 'vat_total', 'total', 'paid_total', 'created_at']
+            has_fields = all(field in data for field in required_fields)
+            
+            # Verify items structure
+            items_valid = True
+            if 'items' in data and isinstance(data['items'], list) and len(data['items']) > 0:
+                item = data['items'][0]
+                item_fields = ['sku', 'name', 'qty', 'unit_price', 'vat_rate', 'line_total']
+                items_valid = all(field in item for field in item_fields)
+            
+            # Verify customer info if present
+            customer_info_valid = True
+            if data.get('customer_id'):
+                customer_fields = ['customer_name']
+                customer_info_valid = any(field in data for field in customer_fields)
+            
+            # Verify totals calculation
+            totals_valid = True
+            if 'subtotal' in data and 'vat_total' in data and 'total' in data:
+                calculated_total = round(data['subtotal'] + data['vat_total'], 2)
+                totals_valid = abs(calculated_total - data['total']) < 0.01
+            
+            all_valid = has_fields and items_valid and customer_info_valid and totals_valid
+            
+            details = f"Document {data.get('number')} retrieved"
+            if not items_valid:
+                details += " - Items structure invalid"
+            if not customer_info_valid:
+                details += " - Customer info missing"
+            if not totals_valid:
+                details += " - Totals calculation incorrect"
+                
+            self.log_test("Document Detail Structure", all_valid, details)
+            return all_valid
+        return False
+
+    def test_pdf_generation(self):
+        """Test PDF generation endpoint"""
+        if not self.sample_data.get('document'):
+            self.log_test("PDF Generation", False, "No document available for PDF test")
+            return False
+            
+        doc_id = self.sample_data['document']['id']
+        doc_number = self.sample_data['document']['number']
+        
+        # Test PDF generation endpoint
+        url = f"{self.api_url}/documents/{doc_id}/pdf"
+        headers = {'Accept': 'application/pdf'}
+        
+        try:
+            response = requests.get(url, headers=headers, timeout=30)
+            
+            # Check status code
+            status_ok = response.status_code == 200
+            
+            # Check content type
+            content_type = response.headers.get('content-type', '')
+            content_type_ok = 'application/pdf' in content_type
+            
+            # Check content disposition header for filename
+            content_disposition = response.headers.get('content-disposition', '')
+            expected_filename = f"{doc_number}.pdf"
+            filename_ok = expected_filename in content_disposition
+            
+            # Check if response contains PDF binary data
+            content_length = len(response.content)
+            has_content = content_length > 1000  # PDF should be at least 1KB
+            
+            # Check PDF magic bytes
+            is_pdf = response.content.startswith(b'%PDF-')
+            
+            all_checks_pass = status_ok and content_type_ok and filename_ok and has_content and is_pdf
+            
+            details = f"Status: {response.status_code}, Content-Type: {content_type}, Size: {content_length} bytes"
+            if not content_type_ok:
+                details += " - Wrong content type"
+            if not filename_ok:
+                details += f" - Filename issue (expected {expected_filename})"
+            if not has_content:
+                details += " - Content too small"
+            if not is_pdf:
+                details += " - Not valid PDF format"
+                
+            self.log_test("PDF Generation", all_checks_pass, details)
+            return all_checks_pass
+            
+        except Exception as e:
+            self.log_test("PDF Generation", False, f"Error: {str(e)}")
+            return False
+
+    def test_documents_list(self):
+        """Test documents list endpoint"""
+        success, data = self.run_test("Get Documents List", "GET", "documents")
+        if success and isinstance(data, list):
+            self.log_test("Documents List", True, f"Found {len(data)} documents")
+            
+            # If we have documents, verify structure
+            if len(data) > 0:
+                doc = data[0]
+                required_fields = ['id', 'number', 'doc_type', 'status', 'total', 'created_at']
+                has_fields = all(field in doc for field in required_fields)
+                self.log_test("Documents List Structure", has_fields, 
+                             "Document list items have required fields" if has_fields else "Missing required fields in document list")
+                return has_fields
+            return True
+        return False
+
+    def run_document_tests(self):
+        """Run document-specific tests for PDF generation and navigation"""
+        print(f"🚀 Starting Document PDF Generation and Navigation Tests")
+        print(f"📍 Testing endpoint: {self.api_url}")
+        print("=" * 60)
+        
+        # Basic connectivity
+        self.test_api_root()
+        
+        # Get required data
+        self.test_products()
+        self.test_customers()
+        
+        # Document functionality tests
+        self.test_document_creation()
+        self.test_document_detail()
+        self.test_pdf_generation()
+        self.test_documents_list()
+        
+        # Print summary
+        print("=" * 60)
+        print(f"📊 Test Summary: {self.tests_passed}/{self.tests_run} tests passed")
+        
+        if self.tests_passed == self.tests_run:
+            print("🎉 All document tests passed!")
+            return True
+        else:
+            print(f"⚠️  {self.tests_run - self.tests_passed} tests failed")
+            return False
+
     def run_all_tests(self):
         """Run all API tests"""
         print(f"🚀 Starting ALPHA&CO POS API Tests")
