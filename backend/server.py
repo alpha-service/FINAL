@@ -270,6 +270,58 @@ class ReturnCreate(BaseModel):
     refund_method: Optional[PaymentMethod] = None
     notes: Optional[str] = None
 
+# Shopify Integration Models
+class ShopifySettings(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    store_domain: str
+    access_token: str
+    auto_sync_enabled: bool = False
+    sync_interval_minutes: int = 10
+    import_products_enabled: bool = True
+    export_stock_enabled: bool = True
+    import_orders_enabled: bool = True
+    last_product_sync: Optional[str] = None
+    last_stock_sync: Optional[str] = None
+    last_order_sync: Optional[str] = None
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+class ShopifySettingsUpdate(BaseModel):
+    store_domain: Optional[str] = None
+    access_token: Optional[str] = None
+    auto_sync_enabled: Optional[bool] = None
+    sync_interval_minutes: Optional[int] = None
+    import_products_enabled: Optional[bool] = None
+    export_stock_enabled: Optional[bool] = None
+    import_orders_enabled: Optional[bool] = None
+
+class ShopifySyncLog(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    sync_type: str  # product_import, stock_export, order_import
+    status: ShopifySyncStatus
+    items_processed: int = 0
+    items_succeeded: int = 0
+    items_failed: int = 0
+    error_message: Optional[str] = None
+    details: Optional[Dict[str, Any]] = None
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+class UnmappedProduct(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    shopify_product_id: str
+    shopify_variant_id: str
+    title: str
+    sku: Optional[str] = None
+    barcode: Optional[str] = None
+    price: float
+    inventory_qty: int
+    reason: str  # missing_sku, duplicate_sku, duplicate_barcode
+    shopify_data: Optional[Dict[str, Any]] = None
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
 # ============= HELPERS =============
 async def generate_document_number(doc_type: DocumentType) -> str:
     today = datetime.now(timezone.utc).strftime("%y%m%d")
