@@ -102,26 +102,45 @@
 
 ## Prioritized Backlog
 
-### P0 (Critical - Sprint 2)
-- [ ] Customers module: Create/Edit customers
-- [ ] Credit/Partial payments with debt tracking
-- [ ] Invoice status management (Draft/Unpaid/Paid/Partially Paid)
-- [ ] Daily Z report with VAT breakdown
+### In Progress (Phase 2 - Order: B → C → D → E → F → G)
+- [ ] **B) Sales History + Documents Hub UI Logic** - Connect frontend to backend, test filters and actions
+- [ ] **C) Cash Register/Shifts UI** - Build shift open/close flow, cash movement forms, Z report display
+- [ ] **D) Quotation Workflow** - Enable "Save as Quote" from POS, quote-to-invoice conversion
+- [ ] **E) Returns & Credit Notes UI** - Complete return flow with refund processing
+- [ ] **F) Inventory UI** - Stock movements display, adjustment forms, alerts dashboard
+- [ ] **G) Integration Placeholders** - Complete hardware and Peppol UI stubs
 
-### P1 (High Priority - Sprint 3)
-- [ ] Admin sales list with filters (date, client, status, amount)
-- [ ] Export functionality (CSV, PDF)
-- [ ] User authentication (Supabase Auth + PIN for cashiers)
-- [ ] Audit logging for critical actions
+### P0 (Next After Phase 2)
+- [ ] End-to-end testing with testing subagent
+- [ ] PDF generation fix (jspdf-autotable integration)
+- [ ] RESTful API status code fix (201 for POST /api/sales)
+- [ ] Migrate from mock data to Supabase (Postgres, Auth, Storage)
+
+### P1 (High Priority - Future Enhancements)
+- [ ] Actual Shopify API integration (currently placeholder)
+- [ ] User authentication with role-based access (Admin, Manager, Cashier with PIN)
+- [ ] Advanced reporting (sales trends, top products, customer analytics)
+- [ ] Customer credit tracking and payment reminders
 
 ### P2 (Medium Priority - Future)
 - [ ] Multi-warehouse stock management
 - [ ] Supplier purchases module
-- [ ] Hardware integrations (ESC/POS printers, barcode scanners)
+- [ ] Hardware integrations (ESC/POS printers with serial communication, barcode scanner HID parsing)
+- [ ] Peppol UBL XML generation and sending
 - [ ] Dark mode support
+- [ ] Multi-currency support
 
 ## Next Action Items
-1. Implement Customer CRUD (Create/Edit forms)
-2. Add invoice status management
-3. Build daily sales report (Z report)
-4. Connect to real Supabase instance
+1. Build out Documents Hub and Sales History UI logic (Phase 2-B)
+2. Implement Cash Register/Shifts UI (Phase 2-C)
+3. Add Quotation workflow to POS screen (Phase 2-D)
+4. Complete Returns UI (Phase 2-E)
+5. Build Inventory UI (Phase 2-F)
+6. Finalize integration placeholders (Phase 2-G)
+7. Run comprehensive testing with testing subagent
+8. Fix PDF generation (jspdf-autotable)
+
+## Known Issues
+- PDF generation uses simplified fallback (jspdf-autotable not working)
+- Emergent badge overlap fixed (body padding-bottom: 60px)
+- HTTP 200 vs 201 for POST /api/sales (minor REST convention)
