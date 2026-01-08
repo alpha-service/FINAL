@@ -1,0 +1,96 @@
+{
+  "timestamp": "2026-01-08T06:20:25.758657",
+  "test_type": "document_tests",
+  "summary": {
+    "total_tests": 13,
+    "passed_tests": 13,
+    "failed_tests": 0,
+    "success_rate": "100.0%"
+  },
+  "test_results": [
+    {
+      "test_name": "API Root",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Get Products",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Products Structure",
+      "success": true,
+      "details": "Found 50 products with required fields",
+      "response_data": null
+    },
+    {
+      "test_name": "Get Customers",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Customers Structure",
+      "success": true,
+      "details": "Found 10 customers with required fields",
+      "response_data": null
+    },
+    {
+      "test_name": "Create Document (Quote)",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Document Creation Structure",
+      "success": true,
+      "details": "Quote created with number DV260108-003, total \u20ac23.23",
+      "response_data": null
+    },
+    {
+      "test_name": "Get Document Detail",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Document Detail Structure",
+      "success": true,
+      "details": "Document DV260108-003 retrieved",
+      "response_data": null
+    },
+    {
+      "test_name": "PDF Generation",
+      "success": true,
+      "details": "Status: 200, Content-Type: application/pdf, Size: 2222 bytes",
+      "response_data": null
+    },
+    {
+      "test_name": "Get Documents List",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Documents List",
+      "success": true,
+      "details": "Found 6 documents",
+      "response_data": null
+    },
+    {
+      "test_name": "Documents List Structure",
+      "success": true,
+      "details": "Document list items have required fields",
+      "response_data": null
+    }
+  ],
+  "sample_data": {
+    "categories_count": 0,
+    "products_count": 50,
+    "customers_count": 10,
+    "document_created": true
+  }
+}
