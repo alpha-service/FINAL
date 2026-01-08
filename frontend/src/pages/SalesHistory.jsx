@@ -192,49 +192,86 @@ export default function SalesHistory() {
 
       {/* Filters */}
       <div className="bg-white rounded-lg border border-slate-200 p-4 mb-6">
-        <form onSubmit={handleSearch} className="flex flex-wrap gap-4">
-          <div className="flex-1 min-w-[200px]">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <form onSubmit={handleSearch} className="space-y-4">
+          {/* First Row: Search, Status, Payment */}
+          <div className="flex flex-wrap gap-4">
+            <div className="flex-1 min-w-[200px]">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="N° facture, client, SKU..."
+                  className="pl-10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  data-testid="search-sales"
+                />
+              </div>
+            </div>
+            
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[180px]" data-testid="status-filter">
+                <SelectValue placeholder="Statut" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les statuts</SelectItem>
+                <SelectItem value="paid">Payé</SelectItem>
+                <SelectItem value="unpaid">Impayé</SelectItem>
+                <SelectItem value="partially_paid">Partiel</SelectItem>
+                <SelectItem value="credited">Crédité</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Paiement" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les paiements</SelectItem>
+                <SelectItem value="cash">Espèces</SelectItem>
+                <SelectItem value="card">Carte</SelectItem>
+                <SelectItem value="bank_transfer">Virement</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Second Row: Date Range, Channel, Filter Button */}
+          <div className="flex flex-wrap gap-4 items-end">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Date début</label>
               <Input
-                placeholder="N° facture, client, SKU..."
-                className="pl-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                data-testid="search-sales"
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="w-[160px]"
               />
             </div>
+            
+            <div>
+              <label className="text-sm font-medium mb-1 block">Date fin</label>
+              <Input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="w-[160px]"
+              />
+            </div>
+
+            <Select value={channelFilter} onValueChange={setChannelFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Canal" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous canaux</SelectItem>
+                <SelectItem value="store">Magasin</SelectItem>
+                <SelectItem value="online">En ligne</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button type="submit" variant="outline">
+              <Filter className="w-4 h-4 mr-2" />
+              Filtrer
+            </Button>
           </div>
-          
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px]" data-testid="status-filter">
-              <SelectValue placeholder="Statut" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous les statuts</SelectItem>
-              <SelectItem value="paid">Payé</SelectItem>
-              <SelectItem value="unpaid">Impayé</SelectItem>
-              <SelectItem value="partially_paid">Partiel</SelectItem>
-              <SelectItem value="credited">Crédité</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={paymentFilter} onValueChange={setPaymentFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Paiement" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous les paiements</SelectItem>
-              <SelectItem value="cash">Espèces</SelectItem>
-              <SelectItem value="card">Carte</SelectItem>
-              <SelectItem value="bank_transfer">Virement</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Button type="submit" variant="outline">
-            <Filter className="w-4 h-4 mr-2" />
-            Filtrer
-          </Button>
         </form>
       </div>
 
