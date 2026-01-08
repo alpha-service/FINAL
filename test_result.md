@@ -102,7 +102,7 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Test the navigation menu and verify all routes are accessible from the POS screen"
+user_problem_statement: "Test Phase 2-B implementation: Devis workflow and Sales History enhancements"
 
 frontend:
   - task: "Navigation Menu Visibility"
@@ -179,6 +179,90 @@ frontend:
         - working: true
           agent: "testing"
           comment: "✅ PASSED: Active navigation highlighting working correctly. Active links show 'bg-white/10 text-white' classes, providing proper visual feedback for current page. Tested on POS and Products pages - highlighting updates correctly when navigating between pages."
+
+  - task: "Devis Button in POS Cart"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/POSScreen.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "testing"
+          comment: "Need to test new 'Devis' button in POS cart between 'Annuler' and 'Payer' buttons"
+
+  - task: "Devis Creation from POS"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/POSScreen.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "testing"
+          comment: "Need to test quote creation functionality - should create quote with 'DV' prefix and navigate to document detail"
+
+  - task: "Sales History Enhanced Filters"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/SalesHistory.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "testing"
+          comment: "Need to test two-row filter layout with date range and channel filters"
+
+  - task: "Sales History Canal Column"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/SalesHistory.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "testing"
+          comment: "Need to verify Canal column shows 🏪 Magasin or 🌐 En ligne icons"
+
+  - task: "Document Detail Page Enhancement"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/DocumentDetail.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "testing"
+          comment: "Need to test enhanced document detail with customer info, items table, and action buttons"
+
+  - task: "Quote to Invoice Conversion"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/DocumentDetail.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "testing"
+          comment: "Need to test 'Convertir' button functionality for quotes"
+
+  - task: "Documents Hub Tabs"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/DocumentsHub.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "testing"
+          comment: "Need to test tabs: Tous, Devis, Factures, Tickets, Crédits and convert actions"
 
 metadata:
   created_by: "testing_agent"
