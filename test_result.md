@@ -405,11 +405,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Document Creation API"
-    - "Document Detail Endpoint" 
-    - "PDF Download Endpoint"
-    - "Partial Payment Flow"
-    - "Payment Edge Cases"
+    - "Premium Document Viewer - NexoPOS-style Layout"
   stuck_tasks:
     - "Payment Edge Cases"
   test_all: false
