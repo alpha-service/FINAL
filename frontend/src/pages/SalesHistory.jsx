@@ -336,6 +336,11 @@ export default function SalesHistory() {
                         <span>{sale.customer_name || "Client comptoir"}</span>
                       </div>
                     </td>
+                    <td className="p-4 text-center">
+                      <Badge variant="outline" className="text-xs">
+                        {sale.channel === "online" ? "🌐 En ligne" : "🏪 Magasin"}
+                      </Badge>
+                    </td>
                     <td className="p-4 text-sm text-muted-foreground">
                       {sale.items?.length || 0} article(s)
                     </td>
