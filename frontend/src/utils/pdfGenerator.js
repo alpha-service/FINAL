@@ -1,5 +1,4 @@
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 
 // Company info
 const COMPANY = {
@@ -81,7 +80,7 @@ export const generateReceiptPDF = (sale, customer = null) => {
   // Customer info if available
   if (customer || sale.customer_name) {
     doc.setFillColor(247, 250, 252);
-    doc.rect(margin, y, pageWidth - margin * 2, 25, "F");
+    doc.rect(margin, y, pageWidth - margin * 2, 20, "F");
     
     doc.setTextColor(...navyBlue);
     doc.setFontSize(10);
@@ -90,22 +89,39 @@ export const generateReceiptPDF = (sale, customer = null) => {
     
     doc.setFont("helvetica", "normal");
     const customerName = customer?.name || sale.customer_name || "Client comptoir";
-    doc.text(customerName, margin + 5, y + 15);
+    doc.text(customerName, margin + 5, y + 14);
     
-    if (customer?.vat_number) {
-      doc.text(`TVA: ${customer.vat_number}`, margin + 5, y + 21);
-    }
-    if (customer?.phone) {
-      doc.text(customer.phone, pageWidth - margin - 5, y + 15, { align: "right" });
-    }
-    
-    y += 30;
+    y += 25;
   }
 
   y += 5;
 
-  // Items table
-  const tableData = sale.items.map(item => {
+  // Table Header
+  doc.setFillColor(...navyBlue);
+  doc.rect(margin, y, pageWidth - margin * 2, 8, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  
+  doc.text("SKU", margin + 3, y + 5.5);
+  doc.text("Description", margin + 35, y + 5.5);
+  doc.text("Qté", margin + 100, y + 5.5);
+  doc.text("Prix", margin + 120, y + 5.5);
+  doc.text("Total", pageWidth - margin - 3, y + 5.5, { align: "right" });
+  
+  y += 10;
+
+  // Table rows
+  doc.setTextColor(30, 30, 30);
+  doc.setFont("helvetica", "normal");
+  
+  sale.items.forEach((item, idx) => {
+    // Alternate row color
+    if (idx % 2 === 1) {
+      doc.setFillColor(250, 250, 250);
+      doc.rect(margin, y - 1, pageWidth - margin * 2, 8, "F");
+    }
+    
     let lineSubtotal = item.qty * item.unit_price;
     if (item.discount_type === "percent") {
       lineSubtotal -= lineSubtotal * (item.discount_value / 100);
@@ -113,55 +129,18 @@ export const generateReceiptPDF = (sale, customer = null) => {
       lineSubtotal -= item.discount_value;
     }
     
-    return [
-      item.sku,
-      item.name,
-      item.qty.toString(),
-      `€${item.unit_price.toFixed(2)}`,
-      item.discount_value > 0 
-        ? (item.discount_type === "percent" ? `${item.discount_value}%` : `€${item.discount_value}`)
-        : "-",
-      `€${lineSubtotal.toFixed(2)}`
-    ];
+    doc.setTextColor(30, 30, 30);
+    doc.setFontSize(8);
+    doc.text(item.sku.substring(0, 15), margin + 3, y + 4);
+    doc.text(item.name.substring(0, 30), margin + 35, y + 4);
+    doc.text(item.qty.toString(), margin + 100, y + 4);
+    doc.text(`€${item.unit_price.toFixed(2)}`, margin + 120, y + 4);
+    doc.text(`€${lineSubtotal.toFixed(2)}`, pageWidth - margin - 3, y + 4, { align: "right" });
+    
+    y += 8;
   });
 
-  autoTable(doc, {
-    startY: y,
-    head: [[
-      "SKU",
-      "Description",
-      "Qté",
-      "Prix unit.",
-      "Remise",
-      "Total"
-    ]],
-    body: tableData,
-    theme: "plain",
-    headStyles: {
-      fillColor: navyBlue,
-      textColor: [255, 255, 255],
-      fontStyle: "bold",
-      fontSize: 9
-    },
-    bodyStyles: {
-      fontSize: 9,
-      textColor: [30, 30, 30]
-    },
-    columnStyles: {
-      0: { cellWidth: 30 },
-      1: { cellWidth: "auto" },
-      2: { cellWidth: 15, halign: "center" },
-      3: { cellWidth: 25, halign: "right" },
-      4: { cellWidth: 20, halign: "center" },
-      5: { cellWidth: 25, halign: "right" }
-    },
-    margin: { left: margin, right: margin },
-    alternateRowStyles: {
-      fillColor: [250, 250, 250]
-    }
-  });
-
-  y = doc.previousAutoTable.finalY + 10;
+  y += 10;
 
   // Totals section
   const totalsX = pageWidth - margin - 70;
@@ -172,8 +151,10 @@ export const generateReceiptPDF = (sale, customer = null) => {
 
   doc.setTextColor(...gray);
   doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
 
   // Global discount if any
+  let yOffset = 0;
   if (sale.global_discount_value > 0) {
     doc.text("Remise globale:", totalsX + 5, y + 7);
     doc.text(
@@ -184,25 +165,25 @@ export const generateReceiptPDF = (sale, customer = null) => {
       y + 7,
       { align: "right" }
     );
-    y += 5;
+    yOffset = 5;
   }
 
-  doc.text("Sous-total HT:", totalsX + 5, y + 7);
-  doc.text(`€${sale.subtotal.toFixed(2)}`, totalsX + totalsWidth - 5, y + 7, { align: "right" });
+  doc.text("Sous-total HT:", totalsX + 5, y + 7 + yOffset);
+  doc.text(`€${sale.subtotal.toFixed(2)}`, totalsX + totalsWidth - 5, y + 7 + yOffset, { align: "right" });
 
-  doc.text("TVA (21%):", totalsX + 5, y + 14);
-  doc.text(`€${sale.vat_total.toFixed(2)}`, totalsX + totalsWidth - 5, y + 14, { align: "right" });
+  doc.text("TVA (21%):", totalsX + 5, y + 14 + yOffset);
+  doc.text(`€${sale.vat_total.toFixed(2)}`, totalsX + totalsWidth - 5, y + 14 + yOffset, { align: "right" });
 
   // Total
   doc.setFillColor(...orange);
-  doc.rect(totalsX, y + 20, totalsWidth, 12, "F");
+  doc.rect(totalsX, y + 20 + yOffset, totalsWidth, 12, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
-  doc.text("TOTAL TTC:", totalsX + 5, y + 28);
-  doc.text(`€${sale.total.toFixed(2)}`, totalsX + totalsWidth - 5, y + 28, { align: "right" });
+  doc.text("TOTAL TTC:", totalsX + 5, y + 28 + yOffset);
+  doc.text(`€${sale.total.toFixed(2)}`, totalsX + totalsWidth - 5, y + 28 + yOffset, { align: "right" });
 
-  y += 40;
+  y += 45 + yOffset;
 
   // Payment info
   if (sale.payments && sale.payments.length > 0) {
@@ -224,8 +205,6 @@ export const generateReceiptPDF = (sale, customer = null) => {
       
       doc.text(`${methodLabel}: €${payment.amount.toFixed(2)}`, margin, y + 7 + (idx * 5));
     });
-    
-    y += 15 + (sale.payments.length * 5);
   }
 
   // Status watermark for unpaid
@@ -233,11 +212,10 @@ export const generateReceiptPDF = (sale, customer = null) => {
     doc.setTextColor(255, 100, 100);
     doc.setFontSize(60);
     doc.setFont("helvetica", "bold");
-    doc.text("IMPAYÉ", pageWidth / 2, 150, {
-      align: "center",
-      angle: 45,
-      opacity: 0.3
-    });
+    doc.saveGraphicsState();
+    doc.setGState(new doc.GState({ opacity: 0.3 }));
+    doc.text("IMPAYÉ", pageWidth / 2, 150, { align: "center", angle: 45 });
+    doc.restoreGraphicsState();
   }
 
   // Footer
@@ -268,6 +246,5 @@ export const generateReceiptPDF = (sale, customer = null) => {
 };
 
 export const generateInvoicePDF = (sale, customer) => {
-  // Same as receipt but with more formal invoice format
   return generateReceiptPDF(sale, customer);
 };
