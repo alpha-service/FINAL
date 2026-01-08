@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CreditCard, Banknote, Building2, Check, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,13 @@ export default function PaymentModal({ open, onClose, total, onPaymentComplete }
   const [selectedMethod, setSelectedMethod] = useState("cash");
   const [amountTendered, setAmountTendered] = useState("");
   const [payments, setPayments] = useState([]);
+
+  // Pre-fill amount when modal opens
+  useEffect(() => {
+    if (open && total > 0) {
+      setAmountTendered(total.toFixed(2));
+    }
+  }, [open, total]);
 
   const paidSoFar = payments.reduce((sum, p) => sum + p.amount, 0);
   const remaining = Math.max(0, total - paidSoFar);
