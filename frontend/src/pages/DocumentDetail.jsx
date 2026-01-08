@@ -106,7 +106,11 @@ export default function DocumentDetail() {
     }
   };
 
-  const handlePrint = async () => {
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleDownloadPDF = async () => {
     try {
       const response = await fetch(`${API}/documents/${docId}/pdf`);
       
@@ -116,24 +120,37 @@ export default function DocumentDetail() {
       
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      
-      // Open in new tab
-      window.open(url, '_blank');
-      
-      // Also trigger download
       const a = document.createElement('a');
       a.href = url;
       a.download = `${document.number}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success("PDF téléchargé");
+    } catch (error) {
+      console.error("PDF download error:", error);
+      toast.error("Erreur lors du téléchargement du PDF");
+    }
+  };
+
+  const handleOpenPDFNewTab = async () => {
+    try {
+      const response = await fetch(`${API}/documents/${docId}/pdf`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
       
       setTimeout(() => window.URL.revokeObjectURL(url), 100);
-      
-      toast.success("PDF généré");
     } catch (error) {
-      console.error("PDF generation error:", error);
-      toast.error("Erreur lors de la génération du PDF");
+      console.error("PDF open error:", error);
+      toast.error("Erreur lors de l'ouverture du PDF");
     }
   };
 
