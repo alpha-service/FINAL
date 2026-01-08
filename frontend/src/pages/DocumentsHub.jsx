@@ -106,9 +106,22 @@ export default function DocumentsHub() {
       
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
+      
+      // Format filename: FACTURE_260107-010.pdf
+      const docTypePrefix = {
+        'quote': 'DEVIS',
+        'invoice': 'FACTURE',
+        'receipt': 'TICKET',
+        'credit_note': 'CREDIT',
+        'proforma': 'PROFORMA',
+        'delivery_note': 'LIVRAISON'
+      };
+      const prefix = docTypePrefix[doc.doc_type] || 'DOCUMENT';
+      const filename = `${prefix}_${doc.number}.pdf`;
+      
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${doc.number}.pdf`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
