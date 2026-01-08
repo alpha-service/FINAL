@@ -13,7 +13,8 @@ import {
   Calendar,
   User,
   CreditCard,
-  FileText
+  FileText,
+  ShoppingCart
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
