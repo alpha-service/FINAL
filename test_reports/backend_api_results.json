@@ -1,0 +1,173 @@
+{
+  "timestamp": "2026-01-08T04:24:01.065394",
+  "summary": {
+    "total_tests": 20,
+    "passed_tests": 19,
+    "failed_tests": 1,
+    "success_rate": "95.0%"
+  },
+  "test_results": [
+    {
+      "test_name": "API Root",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Get Categories",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Categories Structure",
+      "success": true,
+      "details": "Found 4 categories with required fields",
+      "response_data": null
+    },
+    {
+      "test_name": "Get Products",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Products Structure",
+      "success": true,
+      "details": "Found 50 products with required fields",
+      "response_data": null
+    },
+    {
+      "test_name": "Get Customers",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Customers Structure",
+      "success": true,
+      "details": "Found 10 customers with required fields",
+      "response_data": null
+    },
+    {
+      "test_name": "Product Search by SKU",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "SKU Search Result",
+      "success": true,
+      "details": "Found product with SKU GG10WP035020",
+      "response_data": null
+    },
+    {
+      "test_name": "Product Category Filter",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Category Filter Result",
+      "success": true,
+      "details": "Found 12 products in category cat-pipes",
+      "response_data": null
+    },
+    {
+      "test_name": "Customer Search by Name",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Customer Search Result",
+      "success": true,
+      "details": "Found customer with name containing 'Jean'",
+      "response_data": null
+    },
+    {
+      "test_name": "Get Individual Product",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Individual Product Result",
+      "success": true,
+      "details": "Retrieved product p001",
+      "response_data": null
+    },
+    {
+      "test_name": "Get Individual Customer",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Individual Customer Result",
+      "success": true,
+      "details": "Retrieved customer c001",
+      "response_data": null
+    },
+    {
+      "test_name": "Create Sale",
+      "success": false,
+      "details": "Status: 200 (expected 201)",
+      "response_data": {
+        "id": "f09af11d-c98c-4f47-afc2-316d73f77804",
+        "number": "260108-001",
+        "status": "paid",
+        "customer_id": "c001",
+        "customer_name": "Jean Dupont",
+        "items": [
+          {
+            "product_id": "p001",
+            "sku": "GG10WP035020",
+            "name": "Tuyau PVC 35mm",
+            "qty": 2,
+            "unit_price": 4.5,
+            "discount_type": null,
+            "discount_value": 0.0,
+            "vat_rate": 21.0,
+            "id": "db33e8fa-b3e0-4074-93b0-03c9d9009016",
+            "line_total": 10.89
+          }
+        ],
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 10.89,
+            "reference": null,
+            "id": "86007ade-97ed-4e89-8a95-84154dfdbe2b",
+            "created_at": "2026-01-08T04:24:00.956523+00:00"
+          }
+        ],
+        "subtotal": 9.0,
+        "vat_total": 1.89,
+        "total": 10.89,
+        "paid_total": 10.89,
+        "global_discount_type": null,
+        "global_discount_value": 0.0,
+        "created_by": null,
+        "created_at": "2026-01-08T04:24:00.957197+00:00"
+      }
+    },
+    {
+      "test_name": "Get Sales",
+      "success": true,
+      "details": "Status: 200",
+      "response_data": null
+    },
+    {
+      "test_name": "Sales List",
+      "success": true,
+      "details": "Found 1 sales",
+      "response_data": null
+    }
+  ],
+  "sample_data": {
+    "categories_count": 4,
+    "products_count": 50,
+    "customers_count": 10
+  }
+}
