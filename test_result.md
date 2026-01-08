@@ -397,6 +397,18 @@ frontend:
           agent: "testing"
           comment: "✅ PREMIUM DOCUMENT VIEWER TESTING PASSED: Successfully verified complete NexoPOS-style layout implementation. 1) Navigation: Eye icon from Documents Hub to /documents/:id works perfectly. 2) A4-Style Layout: Professional white container with shadow (1616px width). 3) Company Branding: ALPHA&CO header (18px, bold) with complete company details. 4) Document Title: 'DEVIS / OFFERTE' in large blue font. 5) Metadata: N°, Date properly displayed. 6) Line Items Table: Complete with zebra stripes, all headers (SKU, Description, Qté, P.U., TVA%, Total). 7) VAT Breakdown: 'DÉTAIL TVA / BTW DETAIL' with correct format (€30.60 + €6.42). 8) Totals Card: Dark navy background with Sous-total HT, TVA, TOTAL TTC. 9) Watermark: 'BROUILLON / ONTWERP' with 45° rotation and transparency for draft documents. 10) Action Buttons: Imprimer, PDF download, Ouvrir PDF all functional. 11) Footer: Complete bank details and thank you message. 12) Professional Styling: Brand colors (Navy #1a365d, Orange #ff6b35), Montserrat headings, clean typography. ALL CRITICAL COMPONENTS VERIFIED - Layout is professional, client-ready, and successfully implements premium NexoPOS-style design."
 
+  - task: "Updated Document Viewer - 11.pdf Layout Match"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/components/DocumentViewer.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ UPDATED DOCUMENT VIEWER - 11.PDF LAYOUT MATCH TESTING COMPLETED: Comprehensive verification of all document types (Ticket, Quote, Invoice) confirms perfect layout match with 11.pdf requirements. 1) Document Structure: ✅ Logo on left (ALPHA&CO), Opening hours on right - both present and positioned correctly. ✅ Document titles centered: 'FACTURE / FACTUUR', 'DEVIS / OFFERTE', 'TICKET DE CAISSE / KASSABON' - all correct. ✅ Document number + date/time below title - format verified (e.g., FA260108-005, DV260108-007, RC260108-004). ✅ TWO bordered boxes: 'VENDEUR / VERKOPER' (left) and 'CLIENT / KLANT' (right) - both present with visible 2px borders. ✅ Seller box contains: Company name, address, TVA, phone, website - all 6/6 items found. ✅ Client box contains customer info when available. ✅ Meta row table with 4 columns: Date | N° de facture | Référence | Date d'échéance - all headers found. ✅ Items table with 7 headers: REF/ART | DESCRIPTION | QUANTITÉ | PRIX UNIT. | REMISE | TVA | TOTAL TTC - complete grid structure. ✅ Bordered table structure: 14+ cells with visible borders confirmed. ✅ Totals area bottom-right with navy background (.bg-brand-navy) - verified. ✅ Triangle watermark in background (alpha-triangle-bg.png) - present and faint. ✅ Footer with 3 bank details (KBC, Belfius, BNP Paribas Fortis) + legal text - all found. 2) PDF Download with Proper Filename: ✅ FACTURE_FA260108-005.pdf, ✅ DEVIS_DV260108-007.pdf, ✅ TICKET_RC260108-004.pdf - all correct formats. 3) Print Preview: ✅ Imprimer button found, enabled, and clickable. 4) Visual Elements: All layout elements match 11.pdf specification perfectly. COMPREHENSIVE TESTING PASSED - Layout implementation is complete and matches all requirements."
+
 metadata:
   created_by: "testing_agent"
   version: "1.0"
