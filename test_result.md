@@ -385,6 +385,18 @@ frontend:
           agent: "testing"
           comment: "🎯 FINAL ACCEPTANCE TEST PASSED: Complete Document Usability Flow verified successfully. ✅ 1. Eye icon navigation: Successfully navigates from Documents Hub to Document Detail page (/documents/:id) - NOT a placeholder. ✅ 2. Document Detail page structure: Displays ALL required sections including document number with status badge, customer information section, items table with correct columns (SKU, Description, Qté, Prix unit., TVA, Total), totals section (Sous-total HT, TVA 21%, Total TTC), and action buttons (Imprimer, Dupliquer, Encaisser if unpaid). ✅ 3. PDF Download: Imprimer button triggers real browser download functionality. ✅ 4. Partial Payment Flow: Created new quote from POS with Encaisser button available - payment dialog opens correctly for partial payments. ✅ 5. Status Updates: Documents Hub correctly shows status distribution (Paid: 5, Unpaid: 2, Partial: 2) and status changes are reflected properly. ALL acceptance criteria met - this is the user's final acceptance test and the complete document workflow is fully functional!"
 
+  - task: "Premium Document Viewer - NexoPOS-style Layout"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/components/DocumentViewer.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PREMIUM DOCUMENT VIEWER TESTING PASSED: Successfully verified complete NexoPOS-style layout implementation. 1) Navigation: Eye icon from Documents Hub to /documents/:id works perfectly. 2) A4-Style Layout: Professional white container with shadow (1616px width). 3) Company Branding: ALPHA&CO header (18px, bold) with complete company details. 4) Document Title: 'DEVIS / OFFERTE' in large blue font. 5) Metadata: N°, Date properly displayed. 6) Line Items Table: Complete with zebra stripes, all headers (SKU, Description, Qté, P.U., TVA%, Total). 7) VAT Breakdown: 'DÉTAIL TVA / BTW DETAIL' with correct format (€30.60 + €6.42). 8) Totals Card: Dark navy background with Sous-total HT, TVA, TOTAL TTC. 9) Watermark: 'BROUILLON / ONTWERP' with 45° rotation and transparency for draft documents. 10) Action Buttons: Imprimer, PDF download, Ouvrir PDF all functional. 11) Footer: Complete bank details and thank you message. 12) Professional Styling: Brand colors (Navy #1a365d, Orange #ff6b35), Montserrat headings, clean typography. ALL CRITICAL COMPONENTS VERIFIED - Layout is professional, client-ready, and successfully implements premium NexoPOS-style design."
+
 metadata:
   created_by: "testing_agent"
   version: "1.0"
