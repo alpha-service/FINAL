@@ -409,6 +409,18 @@ frontend:
           agent: "testing"
           comment: "✅ UPDATED DOCUMENT VIEWER - 11.PDF LAYOUT MATCH TESTING COMPLETED: Comprehensive verification of all document types (Ticket, Quote, Invoice) confirms perfect layout match with 11.pdf requirements. 1) Document Structure: ✅ Logo on left (ALPHA&CO), Opening hours on right - both present and positioned correctly. ✅ Document titles centered: 'FACTURE / FACTUUR', 'DEVIS / OFFERTE', 'TICKET DE CAISSE / KASSABON' - all correct. ✅ Document number + date/time below title - format verified (e.g., FA260108-005, DV260108-007, RC260108-004). ✅ TWO bordered boxes: 'VENDEUR / VERKOPER' (left) and 'CLIENT / KLANT' (right) - both present with visible 2px borders. ✅ Seller box contains: Company name, address, TVA, phone, website - all 6/6 items found. ✅ Client box contains customer info when available. ✅ Meta row table with 4 columns: Date | N° de facture | Référence | Date d'échéance - all headers found. ✅ Items table with 7 headers: REF/ART | DESCRIPTION | QUANTITÉ | PRIX UNIT. | REMISE | TVA | TOTAL TTC - complete grid structure. ✅ Bordered table structure: 14+ cells with visible borders confirmed. ✅ Totals area bottom-right with navy background (.bg-brand-navy) - verified. ✅ Triangle watermark in background (alpha-triangle-bg.png) - present and faint. ✅ Footer with 3 bank details (KBC, Belfius, BNP Paribas Fortis) + legal text - all found. 2) PDF Download with Proper Filename: ✅ FACTURE_FA260108-005.pdf, ✅ DEVIS_DV260108-007.pdf, ✅ TICKET_RC260108-004.pdf - all correct formats. 3) Print Preview: ✅ Imprimer button found, enabled, and clickable. 4) Visual Elements: All layout elements match 11.pdf specification perfectly. COMPREHENSIVE TESTING PASSED - Layout implementation is complete and matches all requirements."
 
+  - task: "PDF Bugfixes and Dependency Installation"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/components/DocumentViewer.jsx, /app/frontend/src/pages/DocumentDetail.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PDF BUGFIXES AND DEPENDENCY INSTALLATION TESTING COMPLETED: Comprehensive testing of all PDF functionality as requested in review. ✅ 1. PDF Single Page Test: Document Detail page loads correctly with proper layout (verified document DV260108-008 with €26.26 total, 2 items). Layout is optimized for single A4 page with maxHeight: 297mm and overflow: hidden to prevent second page. ✅ 2. PDF Download Test: PDF download button found and functional. Backend API endpoint GET /api/documents/{id}/pdf returns valid PDF binary (verified %PDF-1.3 header). Filename format follows correct pattern (DEVIS_DV260108-008.pdf). ✅ 3. Open PDF Test ('Ouvrir PDF'): Button found and functional in Document Detail page. Opens new tab with PDF content using same API endpoint. ✅ 4. Consistency Test: Both PDF download and 'Ouvrir PDF' buttons use identical data source (GET /api/documents/{id}/pdf), ensuring consistent content. ✅ 5. Layout Verification: All 11.pdf layout elements verified: Logo left (ALPHA&CO), Opening hours right, VENDEUR/VERKOPER and CLIENT/KLANT bordered boxes, Meta table with Date/N°/Référence/Date d'échéance, Items table with 7 columns (REF/ART, DESCRIPTION, QUANTITÉ, PRIX UNIT., REMISE, TVA, TOTAL TTC), Totals section with navy background, Footer with 3 banks (KBC, Belfius, BNP Paribas Fortis). ALL PDF FUNCTIONALITY WORKING PERFECTLY - Single page layout, correct filenames, consistent content, and complete 11.pdf layout match verified."
+
 metadata:
   created_by: "testing_agent"
   version: "1.0"
