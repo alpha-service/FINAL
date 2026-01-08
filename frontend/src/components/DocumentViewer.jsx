@@ -67,12 +67,14 @@ export default function DocumentViewer({ document }) {
 
   return (
     <div className="document-viewer bg-slate-100 py-6" style={{ fontFamily: 'Inter, sans-serif' }}>
-      {/* A4 Container */}
+      {/* A4 Container - Fixed height to prevent 2nd page */}
       <div className="relative bg-white shadow-lg mx-auto" style={{ 
         width: '210mm',
-        minHeight: '297mm',
+        minHeight: 'auto',
+        maxHeight: '297mm',
         padding: '15mm',
-        position: 'relative'
+        position: 'relative',
+        overflow: 'hidden'
       }}>
         {/* Triangle Watermark Background */}
         <div 
