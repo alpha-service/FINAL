@@ -26,7 +26,7 @@
 
 ## What's Been Implemented
 
-### Sprint 1 (Completed - 2026-01-08)
+### Sprint 1 (MVP - Completed 2026-01-08)
 ✅ **POS Sales Screen**
 - 2-column layout: products grid (left), sticky cart (right)
 - Product search by SKU, name_fr, name_nl
@@ -35,8 +35,7 @@
 
 ✅ **Cart Functionality**
 - Add products with toast notification
-- Quantity +/- controls
-- Remove items
+- Quantity +/- controls, Remove items
 - Line discounts (% or fixed)
 - Global discount (KORTING button)
 
@@ -59,16 +58,47 @@
 - Payment method display
 - IMPAYÉ watermark for unpaid invoices
 
-✅ **Backend API**
-- Products CRUD: GET /api/products, search, filter by category
-- Categories: GET /api/categories
-- Customers: GET /api/customers, search
-- Sales: POST /api/sales, GET /api/sales
-- Stock auto-decrement on sale
+### Phase 2 (Operations Backbone - In Progress)
 
-✅ **Seed Data**
-- 50 products across 4 categories
-- 10 customers (5 individual, 5 company)
+✅ **Data Model Expansion**
+- Unified Document model (Quote, Invoice, Receipt, Proforma, Credit Note, Delivery Note)
+- Document status tracking (Draft, Sent, Accepted, Unpaid, Partially Paid, Paid, Cancelled, Credited)
+- Shift management with cash movements
+- Stock movements ledger
+- Shopify integration models (Settings, Sync Logs, Unmapped Products)
+
+✅ **Backend API Enhancements**
+- `/api/documents`: Unified CRUD for all document types
+- `/api/documents/{id}/convert`: Convert quotes to invoices
+- `/api/documents/{id}/duplicate`: Duplicate existing documents
+- `/api/returns`: Process returns and generate credit notes
+- `/api/shifts`: Open/close shifts, cash movements, Z reports
+- `/api/stock-movements`: Track all stock changes
+- `/api/stock-alerts`: Low stock notifications
+- `/api/shopify/*`: Shopify integration endpoints (settings, sync products/stock/orders, unmapped products)
+- Peppol placeholder endpoint
+
+✅ **Frontend Pages Scaffolded**
+- **Sales History** (`/sales`): View past sales with filters (status, payment, search), return processing
+- **Documents Hub** (`/documents`): Central view for all document types with tabs, conversion actions
+- **Document Detail** (`/documents/:id`): Individual document view with payment actions
+- **Cash Register** (`/cash-register`): Shift management, cash movements, Z report generation
+- **Inventory** (`/inventory`): Stock tracking, movements ledger, alerts
+- **Settings** (`/settings`): Hardware (Printer, Scanner), Peppol, Shopify configuration
+
+✅ **Shopify Integration (MVP Foundation)**
+- Settings configuration (store domain, access token, sync toggles)
+- Manual sync triggers (import products, push stock, import orders)
+- Sync logs tracking
+- Unmapped products queue for manual mapping
+- Product origin tracking (local vs Shopify)
+- Shopify variant ID mapping
+
+✅ **UI/UX Improvements**
+- MainLayout with sidebar navigation
+- Shift status indicator
+- Stock alerts badge
+- Fixed Emergent badge overlap issue
 
 ## Prioritized Backlog
 
