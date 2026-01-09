@@ -150,9 +150,22 @@ export default function POSScreen() {
     setCart(prev => {
       const existing = prev.find(item => item.product_id === product.id);
       if (existing) {
+        // Highlight item when quantity increases
+        setHighlightedItemId(product.id);
+        setTimeout(() => setHighlightedItemId(null), 800);
+        
         return prev.map(item =>
           item.product_id === product.id
             ? { ...item, qty: item.qty + 1 }
+            : item
+        );
+      }
+      
+      // Highlight new item
+      setHighlightedItemId(product.id);
+      setTimeout(() => setHighlightedItemId(null), 800);
+      
+      return [...prev, {
             : item
         );
       }
