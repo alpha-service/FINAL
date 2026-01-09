@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "sonner";
-import { Search, ShoppingCart, Plus, Minus, Trash2, User, Receipt, X, Printer, Download, FileText } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, User, Receipt, X, Printer, Download, FileText, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -10,9 +10,24 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import PaymentModal from "@/components/PaymentModal";
 import CustomerSelect from "@/components/CustomerSelect";
 import { generateReceiptPDF } from "@/utils/pdfGenerator";
+import { usePOSLayout } from "@/hooks/usePOSLayout";
+import CartCompact from "@/components/pos/CartCompact";
+import CartTable from "@/components/pos/CartTable";
+import CartDrawer from "@/components/pos/CartDrawer";
+import PriceOverrideModal from "@/components/pos/PriceOverrideModal";
+import ResizableHandle from "@/components/pos/ResizableHandle";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
