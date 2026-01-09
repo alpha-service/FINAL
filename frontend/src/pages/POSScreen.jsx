@@ -200,6 +200,28 @@ export default function POSScreen() {
   // Remove from cart
   const removeFromCart = (productId) => {
     setCart(prev => prev.filter(item => item.product_id !== productId));
+    if (selectedItemId === productId) {
+      setSelectedItemId(null);
+    }
+  };
+
+  // Handle price override
+  const handlePriceOverride = (newPrice, metadata) => {
+    const updatedCart = cart.map(item => 
+      item.product_id === priceOverrideItem.product_id
+        ? { 
+            ...item, 
+            unit_price: newPrice, 
+            priceOverridden: true, 
+            overrideMetadata: metadata 
+          }
+        : item
+    );
+    setCart(updatedCart);
+    
+    // Log to console (TODO: Send to backend)
+    console.log('Price Override:', metadata);
+    toast.success(`Prix modifié: €${newPrice.toFixed(2)}`);
   };
 
   // Apply line discount
