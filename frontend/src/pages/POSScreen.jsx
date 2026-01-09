@@ -33,6 +33,21 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function POSScreen() {
   const navigate = useNavigate();
+  
+  // Layout system
+  const {
+    currentPreset,
+    setCurrentPreset,
+    config,
+    cartWidth,
+    updateCartWidth,
+    cycleLayout,
+    drawerOpen,
+    setDrawerOpen,
+    LAYOUT_PRESETS,
+    PRESET_CONFIG
+  } = usePOSLayout();
+  
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [cart, setCart] = useState([]);
@@ -46,6 +61,11 @@ export default function POSScreen() {
   const [showDiscountDialog, setShowDiscountDialog] = useState(false);
   const [discountInput, setDiscountInput] = useState({ type: "percent", value: "" });
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
+  
+  // New layout-related state
+  const [highlightedItemId, setHighlightedItemId] = useState(null);
+  const [priceOverrideItem, setPriceOverrideItem] = useState(null);
+  const [selectedItemId, setSelectedItemId] = useState(null);
 
   // Fetch products and categories
   useEffect(() => {
