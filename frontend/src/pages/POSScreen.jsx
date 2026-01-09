@@ -166,10 +166,6 @@ export default function POSScreen() {
       setTimeout(() => setHighlightedItemId(null), 800);
       
       return [...prev, {
-            : item
-        );
-      }
-      return [...prev, {
         product_id: product.id,
         sku: product.sku,
         name: product.name_fr,
