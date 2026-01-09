@@ -110,6 +110,31 @@ export default function POSScreen() {
     fetchData();
   }, []);
 
+  // Hotkey handlers
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // F6: Cycle layout (Shift+F6 for previous)
+      if (e.key === 'F6') {
+        e.preventDefault();
+        cycleLayout(!e.shiftKey);
+        toast.info(`Mode: ${PRESET_CONFIG[currentPreset].name}`);
+      }
+      // Enter: Pay (if cart not empty and payment modal not open)
+      if (e.key === 'Enter' && cart.length > 0 && !showPayment && !priceOverrideItem) {
+        e.preventDefault();
+        setShowPayment(true);
+      }
+      // Delete: Remove selected item (table view)
+      if (e.key === 'Delete' && selectedItemId) {
+        e.preventDefault();
+        removeFromCart(selectedItemId);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [cart.length, showPayment, priceOverrideItem, selectedItemId, cycleLayout, currentPreset, PRESET_CONFIG]);
+
   // Filter products
   const filteredProducts = products.filter(product => {
     const matchesSearch = !searchQuery || 
