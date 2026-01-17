@@ -266,6 +266,8 @@ export default function SalesHistory() {
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
                 className="w-[160px]"
+                placeholder="jj/mm/aaaa"
+                lang="fr-BE"
               />
             </div>
             
@@ -276,6 +278,8 @@ export default function SalesHistory() {
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
                 className="w-[160px]"
+                placeholder="jj/mm/aaaa"
+                lang="fr-BE"
               />
             </div>
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "sonner";
@@ -9,14 +9,21 @@ import {
   Copy,
   ArrowRight,
   CreditCard,
-  ExternalLink
+  ExternalLink,
+  FileText,
+  FileCheck,
+  FileMinus,
+  MoreVertical,
+  Receipt
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import DocumentViewer from "@/components/DocumentViewer";
+import ThermalReceipt from "@/components/ThermalReceipt";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -48,6 +55,8 @@ export default function DocumentDetail() {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [showThermalReceipt, setShowThermalReceipt] = useState(false);
+  const thermalReceiptRef = useRef(null);
 
   useEffect(() => {
     fetchDocument();
@@ -96,6 +105,26 @@ export default function DocumentDetail() {
     }
   };
 
+  const handleConvertToProforma = async () => {
+    try {
+      const response = await axios.post(`${API}/documents/${docId}/convert?target_type=proforma`);
+      toast.success(`Converti en proforma: ${response.data.number}`);
+      navigate(`/documents/${response.data.id}`);
+    } catch (error) {
+      toast.error("Erreur lors de la conversion");
+    }
+  };
+
+  const handleCreateCreditNote = async () => {
+    try {
+      const response = await axios.post(`${API}/documents/${docId}/convert?target_type=credit_note`);
+      toast.success(`Note de crédit créée: ${response.data.number}`);
+      navigate(`/documents/${response.data.id}`);
+    } catch (error) {
+      toast.error("Erreur lors de la création de la note de crédit");
+    }
+  };
+
   const handleDuplicate = async () => {
     try {
       const response = await axios.post(`${API}/documents/${docId}/duplicate`);
@@ -108,6 +137,73 @@ export default function DocumentDetail() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handlePrintThermal = () => {
+    // Open thermal receipt in a new window for printing
+    const printWindow = window.open('', '_blank', 'width=302,height=800');
+    if (printWindow && thermalReceiptRef.current) {
+      const receiptContent = thermalReceiptRef.current.innerHTML;
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Ticket - ${document.number}</title>
+          <style>
+            @page {
+              size: 80mm auto;
+              margin: 0;
+            }
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
+            body {
+              font-family: 'Courier New', Courier, monospace;
+              font-size: 11px;
+              line-height: 1.3;
+              width: 80mm;
+              max-width: 80mm;
+              padding: 4mm;
+            }
+            .text-center { text-align: center; }
+            .text-xs { font-size: 10px; }
+            .text-sm { font-size: 12px; }
+            .text-lg { font-size: 14px; }
+            .font-bold { font-weight: bold; }
+            .font-medium { font-weight: 500; }
+            .flex { display: flex; }
+            .justify-between { justify-content: space-between; }
+            .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .border-b { border-bottom: 1px dashed black; }
+            .border-t { border-top: 1px dashed black; }
+            .border-black { border-color: black; }
+            .border-dashed { border-style: dashed; }
+            .pb-1 { padding-bottom: 4px; }
+            .pb-2 { padding-bottom: 8px; }
+            .mb-1 { margin-bottom: 4px; }
+            .mb-2 { margin-bottom: 8px; }
+            .mt-1 { margin-top: 4px; }
+            .mt-2 { margin-top: 8px; }
+            .pt-1 { padding-top: 4px; }
+            .opacity-75 { opacity: 0.75; }
+            .tracking-wider { letter-spacing: 0.05em; }
+          </style>
+        </head>
+        <body>
+          ${receiptContent}
+          <script>
+            window.onload = function() { 
+              window.print(); 
+              window.onafterprint = function() { window.close(); }
+            }
+          </script>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
   };
 
   const handleDownloadPDF = async () => {
@@ -204,8 +300,15 @@ export default function DocumentDetail() {
         <div className="flex gap-2">
           <Button variant="outline" onClick={handlePrint}>
             <Printer className="w-4 h-4 mr-2" />
-            Imprimer
+            Imprimer A4
           </Button>
+          {/* Thermal receipt print for tickets */}
+          {(document.doc_type === "receipt" || document.doc_type === "invoice") && (
+            <Button variant="outline" onClick={handlePrintThermal}>
+              <Receipt className="w-4 h-4 mr-2" />
+              Ticket 80mm
+            </Button>
+          )}
           <Button variant="outline" onClick={handleDuplicate}>
             <Copy className="w-4 h-4 mr-2" />
             Dupliquer
@@ -218,12 +321,41 @@ export default function DocumentDetail() {
             <ExternalLink className="w-4 h-4 mr-2" />
             Ouvrir PDF
           </Button>
-          {document.doc_type === "quote" && document.status !== "accepted" && (
-            <Button variant="outline" onClick={handleConvert}>
-              <ArrowRight className="w-4 h-4 mr-2" />
-              Convertir
-            </Button>
+          
+          {/* Convert menu */}
+          {(document.doc_type === "quote" || document.doc_type === "invoice") && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <ArrowRight className="w-4 h-4 mr-2" />
+                  Convertir
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Convertir en</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {document.doc_type === "quote" && (
+                  <>
+                    <DropdownMenuItem onClick={handleConvert}>
+                      <FileCheck className="w-4 h-4 mr-2" />
+                      Facture / Factuur
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleConvertToProforma}>
+                      <FileText className="w-4 h-4 mr-2" />
+                      Proforma
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {document.doc_type === "invoice" && document.status === "paid" && (
+                  <DropdownMenuItem onClick={handleCreateCreditNote}>
+                    <FileMinus className="w-4 h-4 mr-2" />
+                    Note de crédit
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
+          
           {remaining > 0 && (
             <Button 
               className="bg-brand-orange hover:bg-brand-orange/90"
@@ -291,6 +423,11 @@ export default function DocumentDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Hidden Thermal Receipt for printing */}
+      <div className="hidden">
+        <ThermalReceipt ref={thermalReceiptRef} document={document} />
+      </div>
     </div>
   );
 }

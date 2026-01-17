@@ -1,17 +1,35 @@
 /* ALPHA&CO POS Custom Styles */
 
-/* Product card hover effect */
+/* ============= PERFORMANCE OPTIMIZATIONS ============= */
+* {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* GPU acceleration for animated elements */
+.product-card,
+.cart-item,
+.category-tab,
+.pay-button {
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+}
+
+/* Product card hover effect - OPTIMIZED */
 .product-card {
-    transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+    transition: transform 0.12s ease-out, box-shadow 0.12s ease-out, border-color 0.12s ease-out;
+    contain: layout style paint;
 }
 
 .product-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px -5px rgba(26, 54, 93, 0.15);
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 8px 20px -5px rgba(26, 54, 93, 0.2);
 }
 
 .product-card:active {
-    transform: translateY(0);
+    transform: scale(0.98);
+    transition: transform 0.08s ease-out;
 }
 
 /* Cart item animations */
@@ -104,6 +122,19 @@
 /* Smooth scrolling for product grid */
 .product-grid {
     scroll-behavior: smooth;
+    contain: layout style;
+}
+
+/* Instant scroll for performance */
+@media (prefers-reduced-motion: reduce) {
+    .product-grid {
+        scroll-behavior: auto;
+    }
+    .product-card,
+    .cart-item {
+        animation: none !important;
+        transition: none !important;
+    }
 }
 
 /* Price styling */
@@ -111,6 +142,15 @@
     font-family: 'Montserrat', sans-serif;
     font-weight: 700;
     letter-spacing: -0.02em;
+}
+
+/* Compact cart mode */
+.compact-cart-item {
+    transition: background-color 0.1s ease-out;
+}
+
+.compact-cart-item:hover {
+    background-color: rgba(241, 245, 249, 0.8);
 }
 
 /* Skeleton loading */
@@ -142,12 +182,105 @@
     }
 }
 
-/* Print styles */
+/* Print styles - Hide all non-document elements */
 @media print {
-    .no-print {
+    /* Hide navigation, sidebar, buttons, and UI elements */
+    .no-print,
+    nav,
+    header,
+    aside,
+    .sidebar,
+    [class*="sidebar"],
+    [class*="Sidebar"],
+    [data-testid*="sidebar"],
+    [data-testid="bottom-nav"],
+    button,
+    .btn,
+    .fixed,
+    footer:not(.document-footer),
+    [role="navigation"],
+    [class*="drawer"],
+    [class*="modal"],
+    .absolute:not(.printable-document *),
+    .sticky,
+    input,
+    select {
         display: none !important;
     }
-    .print-only {
+    
+    /* Show only document area */
+    .print-only,
+    .document-container,
+    .printable-document {
         display: block !important;
     }
+    
+    /* Full width document */
+    .document-area,
+    .document-content,
+    .document-viewer,
+    .printable-document,
+    [data-testid="document-viewer"],
+    [data-testid="document-detail"] {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+        background: white !important;
+    }
+    
+    /* Reset body for print */
+    body {
+        background: white !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: visible !important;
+    }
+    
+    /* Ensure document pages break properly */
+    .page-break {
+        page-break-after: always;
+    }
+    
+    /* Hide all fixed elements */
+    .fixed, [style*="position: fixed"] {
+        display: none !important;
+    }
+    
+    /* Make main content full width */
+    main, [role="main"] {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+
+    /* Document viewer specific print styles */
+    .document-viewer {
+        padding: 0 !important;
+        background: white !important;
+    }
+    
+    .document-viewer > div {
+        margin: 0 !important;
+        box-shadow: none !important;
+    }
+}
+
+/* Date input styling for French locale */
+input[type="date"]::-webkit-datetime-edit-fields-wrapper {
+    font-family: 'Inter', sans-serif;
+}
+
+input[type="date"]::-webkit-datetime-edit {
+    font-family: 'Inter', sans-serif;
+}
+
+/* Force date format display */
+input[type="date"]:not(:focus):not([value])::-webkit-datetime-edit-text,
+input[type="date"]:not(:focus):not([value])::-webkit-datetime-edit-month-field,
+input[type="date"]:not(:focus):not([value])::-webkit-datetime-edit-day-field,
+input[type="date"]:not(:focus):not([value])::-webkit-datetime-edit-year-field {
+    color: #9ca3af;
 }

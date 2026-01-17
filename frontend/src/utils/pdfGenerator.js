@@ -7,9 +7,9 @@ const COMPANY = {
   address: "Ninoofsesteenweg 77-79",
   city: "1700 Dilbeek, Belgique",
   vat: "BE 1028.386.674",
-  phone: "+32 (0)2/1111/111",
-  email: "info@alphanco.be",
-  hours: "Lun-Sam 07:00-18:00"
+  phone: "+32 2 449 81 22",
+  email: "info@alphaco.be",
+  hours: "Lu-Ve 08:00-17:30, Sa 09:00-13:00"
 };
 
 export const generateReceiptPDF = (sale, customer = null) => {

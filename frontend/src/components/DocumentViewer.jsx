@@ -44,6 +44,9 @@ export default function DocumentViewer({ document }) {
   const showWatermark = ["draft", "unpaid", "partially_paid"].includes(document.status);
   const watermarkText = STATUS_WATERMARKS[document.status];
 
+  // Add print-specific class to ensure only this component prints
+  const containerClass = "document-viewer printable-document";
+
   // Group VAT lines by rate
   const vatBreakdown = {};
   let totalHT = 0;
@@ -66,9 +69,9 @@ export default function DocumentViewer({ document }) {
   });
 
   return (
-    <div className="document-viewer bg-slate-100 py-6" style={{ fontFamily: 'Inter, sans-serif' }}>
+    <div className={`${containerClass} bg-slate-100 py-6`} style={{ fontFamily: 'Inter, sans-serif' }} data-testid="document-viewer">
       {/* A4 Container - Fixed height to prevent 2nd page */}
-      <div className="relative bg-white shadow-lg mx-auto" style={{ 
+      <div className="relative bg-white shadow-lg mx-auto print:shadow-none print:m-0" style={{ 
         width: '210mm',
         minHeight: 'auto',
         maxHeight: '297mm',
@@ -130,7 +133,7 @@ export default function DocumentViewer({ document }) {
               <div>Lu-Ve / Ma-Vr: 08h00 - 17h30</div>
               <div>Sa / Za: 09h00 - 13h00</div>
               <div className="mt-2">
-                <div>Tél: +32 2 569 00 74</div>
+                <div>Tél: +32 2 449 81 22</div>
                 <div>info@alphaco.be</div>
               </div>
             </div>
@@ -172,7 +175,7 @@ export default function DocumentViewer({ document }) {
                 <div>1700 Dilbeek</div>
                 <div className="mt-2">
                   <div>TVA: BE 1028.386.674</div>
-                  <div>Tél: +32 2 569 00 74</div>
+                  <div>Tél: +32 2 449 81 22</div>
                   <div>www.alphaco.be</div>
                 </div>
               </div>

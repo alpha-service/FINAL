@@ -15,7 +15,9 @@ import {
   Truck,
   CreditCard,
   ArrowRight,
-  Plus
+  Plus,
+  Send,
+  Globe
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { generateReceiptPDF } from "@/utils/pdfGenerator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -93,6 +96,24 @@ export default function DocumentsHub() {
       navigate(`/documents/${response.data.id}`);
     } catch (error) {
       toast.error("Erreur lors de la conversion");
+    }
+  };
+
+  const handleSendPeppol = async (doc) => {
+    try {
+      toast.loading("Envoi via Peppol en cours...", { id: "peppol-send" });
+      const response = await axios.post(`${API}/documents/${doc.id}/send-peppol`);
+      toast.success(
+        <div>
+          <div className="font-medium">Envoyé via Peppol!</div>
+          <div className="text-xs opacity-75">ID: {response.data.peppol_message_id}</div>
+        </div>,
+        { id: "peppol-send", duration: 5000 }
+      );
+      fetchDocuments();
+    } catch (error) {
+      const errorMsg = error.response?.data?.detail || "Erreur lors de l'envoi Peppol";
+      toast.error(errorMsg, { id: "peppol-send" });
     }
   };
 
@@ -313,6 +334,41 @@ export default function DocumentsHub() {
                               >
                                 <Download className="w-4 h-4" />
                               </Button>
+                              {/* Peppol send button for invoices */}
+                              {doc.doc_type === "invoice" && doc.peppol_recipient_id && !doc.peppol_sent && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleSendPeppol(doc)}
+                                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                      >
+                                        <Globe className="w-4 h-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Envoyer via Peppol</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                              {doc.peppol_sent && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                        <Send className="w-3 h-3 mr-1" />
+                                        Peppol
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Envoyé via Peppol le {new Date(doc.peppol_sent_at).toLocaleDateString("fr-BE")}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
                               {doc.doc_type === "quote" && doc.status !== "accepted" && (
                                 <Button
                                   variant="ghost"

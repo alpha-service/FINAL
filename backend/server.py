@@ -39,8 +39,9 @@ class DocumentType(str, Enum):
     INVOICE = "invoice"  # Facture
     RECEIPT = "receipt"  # Ticket de caisse
     PROFORMA = "proforma"
-    CREDIT_NOTE = "credit_note"  # Note de crédit
+    CREDIT_NOTE = "credit_note"  # Note de crédit / Bon d'avoir
     DELIVERY_NOTE = "delivery_note"  # Bon de livraison
+    PURCHASE_ORDER = "purchase_order"  # Bon de commande
 
 class DocumentStatus(str, Enum):
     DRAFT = "draft"
@@ -79,6 +80,12 @@ class CashMovementType(str, Enum):
     SALE = "sale"
     REFUND = "refund"
 
+class UserRole(str, Enum):
+    ADMIN = "admin"
+    MANAGER = "manager"
+    CASHIER = "cashier"
+    VIEWER = "viewer"
+
 class ProductOrigin(str, Enum):
     LOCAL = "local"
     SHOPIFY = "shopify"
@@ -100,37 +107,84 @@ class Product(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     sku: str
-    barcode: Optional[str] = None
+    barcode: Optional[str] = None  # EAN-13, UPC, etc.
+    gtin: Optional[str] = None  # Global Trade Item Number (EAN/UPC)
     name_fr: str
     name_nl: str
+    description_fr: Optional[str] = None
+    description_nl: Optional[str] = None
     category_id: str
     unit: Unit
     price_retail: float
     price_wholesale: Optional[float] = None
     price_loyal: Optional[float] = None
+    compare_at_price: Optional[float] = None  # Prix barré (ancien prix)
+    cost_price: Optional[float] = None  # Prix d'achat
     vat_rate: float = 21.0
     stock_qty: int = 0
     min_stock: int = 0
+    # Physical attributes
+    weight: Optional[float] = None  # Poids en kg
+    weight_unit: str = "kg"  # kg, g, lb
+    length: Optional[float] = None  # cm
+    width: Optional[float] = None  # cm
+    height: Optional[float] = None  # cm
+    depth: Optional[float] = None  # cm (profondeur)
+    size: Optional[str] = None  # Taille (S, M, L, XL, etc.)
+    color: Optional[str] = None  # Couleur
+    material: Optional[str] = None  # Matériau
+    # Metafields from Shopify (dimensions, custom attributes)
+    metafields: Optional[dict] = None  # {"dimension": "50x100cm", "capacity": "500ml", ...}
+    variant_title: Optional[str] = None  # "XL / Blue" from Shopify variant
+    # Shopify fields
+    vendor: Optional[str] = None  # Marque / Fournisseur
+    tags: Optional[str] = None  # Tags séparés par virgule
+    product_type: Optional[str] = None  # Type de produit Shopify
+    collection_ids: Optional[List[str]] = None  # IDs des collections Shopify
     image_url: Optional[str] = None
     origin: ProductOrigin = ProductOrigin.LOCAL
     shopify_variant_id: Optional[str] = None
     shopify_product_id: Optional[str] = None
+    shopify_inventory_item_id: Optional[str] = None
+    # Timestamps
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at: Optional[str] = None
 
 class Customer(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     type: CustomerType
     name: str
+    # Peppol identifiers
+    peppol_id: Optional[str] = None  # Format: 0208:BE0123456789
+    endpoint_id: Optional[str] = None  # Electronic Address Identifier
+    company_id: Optional[str] = None  # Numéro BCE/KBO (différent du TVA)
     vat_number: Optional[str] = None
+    # Contact
+    contact_name: Optional[str] = None  # Personne de contact
     phone: Optional[str] = None
     email: Optional[str] = None
-    address: Optional[str] = None
+    # Adresse structurée (Peppol compliant)
+    street_name: Optional[str] = None
+    building_number: Optional[str] = None
+    address: Optional[str] = None  # Adresse complète (legacy)
     city: Optional[str] = None
     postal_code: Optional[str] = None
+    country_subdivision: Optional[str] = None  # Région/Province
     country: str = "BE"
+    # Paiement
+    payment_terms_days: int = 30  # Délai de paiement
+    bank_account_iban: Optional[str] = None
+    bank_account_bic: Optional[str] = None
+    bank_account_name: Optional[str] = None  # Nom du titulaire
+    # Limites et soldes
     credit_limit: float = 0.0
     balance: float = 0.0  # Negative = owes money
+    # Préférences
+    language: str = "fr"  # fr, nl
+    receive_invoices_by_peppol: bool = False
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at: Optional[str] = None
 
 # Document Items
 class DocumentItemCreate(BaseModel):
@@ -204,8 +258,14 @@ class Document(BaseModel):
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     updated_at: Optional[str] = None
     # Peppol fields
-    peppol_status: Optional[str] = None
+    peppol_status: Optional[str] = None  # pending, sent, delivered, failed
     peppol_id: Optional[str] = None
+    peppol_recipient_id: Optional[str] = None  # e.g., 0208:0123456789
+    peppol_sent: bool = False
+    peppol_sent_at: Optional[str] = None
+    peppol_message_id: Optional[str] = None  # Peppyrus message ID for tracking
+    peppol_delivery_status: Optional[str] = None  # From Peppyrus webhook
+    peppol_ubl_xml: Optional[str] = None  # Stored UBL XML (optional)
 
 # Shifts
 class ShiftCreate(BaseModel):
@@ -223,6 +283,55 @@ class CashMovement(BaseModel):
 class ShiftClose(BaseModel):
     counted_cash: float
     notes: Optional[str] = None
+
+# User/Cashier model
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    full_name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    role: UserRole = UserRole.CASHIER
+    pin_code: Optional[str] = None  # 4-digit PIN for quick login
+    is_active: bool = True
+
+class User(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    username: str
+    password_hash: str  # Hashed password
+    full_name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    role: UserRole = UserRole.CASHIER
+    pin_code: Optional[str] = None
+    is_active: bool = True
+    # Stats
+    total_sales: int = 0
+    total_revenue: float = 0.0
+    total_shifts: int = 0
+    last_login: Optional[str] = None
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at: Optional[str] = None
+
+class UserLogin(BaseModel):
+    username: Optional[str] = None
+    password: Optional[str] = None
+    pin_code: Optional[str] = None
+
+class UserResponse(BaseModel):
+    id: str
+    username: str
+    full_name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    role: UserRole
+    is_active: bool
+    total_sales: int = 0
+    total_revenue: float = 0.0
+    total_shifts: int = 0
+    last_login: Optional[str] = None
+    created_at: str
 
 class Shift(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -282,7 +391,9 @@ class ShopifySettings(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     store_domain: str
-    access_token: str
+    access_token: Optional[str] = None
+    api_key: Optional[str] = None
+    api_secret: Optional[str] = None
     auto_sync_enabled: bool = False
     sync_interval_minutes: int = 10
     import_products_enabled: bool = True
@@ -297,6 +408,8 @@ class ShopifySettings(BaseModel):
 class ShopifySettingsUpdate(BaseModel):
     store_domain: Optional[str] = None
     access_token: Optional[str] = None
+    api_key: Optional[str] = None
+    api_secret: Optional[str] = None
     auto_sync_enabled: Optional[bool] = None
     sync_interval_minutes: Optional[int] = None
     import_products_enabled: Optional[bool] = None
@@ -328,6 +441,60 @@ class UnmappedProduct(BaseModel):
     reason: str  # missing_sku, duplicate_sku, duplicate_barcode
     shopify_data: Optional[Dict[str, Any]] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+# Company Settings (for Peppol/invoicing)
+class CompanySettings(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    # Identification
+    company_name: str = "ALPHA&CO"
+    legal_name: Optional[str] = None  # Raison sociale officielle
+    company_id: Optional[str] = None  # Numéro BCE/KBO (ex: 0123.456.789)
+    vat_number: Optional[str] = None  # Numéro TVA (ex: BE0123456789)
+    # Peppol
+    peppol_id: Optional[str] = None  # Format: 0208:BE0123456789
+    peppol_endpoint_id: Optional[str] = None
+    peppol_enabled: bool = False
+    # Adresse
+    street_name: Optional[str] = None
+    building_number: Optional[str] = None
+    address_line: Optional[str] = None  # Adresse complète
+    city: Optional[str] = None
+    postal_code: Optional[str] = None
+    country: str = "BE"
+    country_name: str = "Belgium"
+    # Contact
+    contact_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    website: Optional[str] = None
+    # Banque
+    bank_account_iban: Optional[str] = None
+    bank_account_bic: Optional[str] = None
+    bank_name: Optional[str] = None
+    # Logo et branding
+    logo_url: Optional[str] = None
+    # Mentions légales
+    invoice_footer_text: Optional[str] = None
+    quote_footer_text: Optional[str] = None
+    receipt_footer_text: Optional[str] = None
+    default_payment_terms_days: int = 30
+    # Timestamps
+    updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+# Peppyrus Integration Settings
+class PeppyrusSettings(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    enabled: bool = False
+    api_key: Optional[str] = None
+    api_secret: Optional[str] = None
+    api_url: str = "https://api.peppyrus.be"  # Peppyrus API endpoint
+    sender_id: Optional[str] = None  # Peppol Sender ID
+    test_mode: bool = True  # Sandbox mode
+    auto_send_invoices: bool = False  # Auto-send on invoice creation
+    last_sync: Optional[str] = None
+    updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 # ============= HELPERS =============
 async def generate_document_number(doc_type: DocumentType) -> str:
@@ -517,13 +684,161 @@ async def seed_database():
     await db.stock_movements.create_index("product_id")
     await db.stock_movements.create_index("created_at")
     await db.shifts.create_index("status")
+    await db.shifts.create_index("cashier_name")
     await db.products.create_index("barcode")
+    await db.products.create_index("name")
+    await db.products.create_index("sku")
+    await db.customers.create_index("name")
+    await db.customers.create_index("email")
+    await db.customers.create_index("vat_number")
+    await db.users.create_index("username", unique=True)
+    await db.users.create_index("email")
+    await db.users.create_index("role")
+    logger.info("Database indexes created")
 
 # ============= API ROUTES =============
 
 @api_router.get("/")
 async def root():
     return {"message": "ALPHA&CO POS API", "version": "2.0.0"}
+
+# --- Users/Cashiers ---
+import hashlib
+
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def verify_password(password: str, hashed: str) -> bool:
+    return hash_password(password) == hashed
+
+@api_router.get("/users", response_model=List[UserResponse])
+async def get_users(role: Optional[UserRole] = None, active_only: bool = True):
+    query = {}
+    if role:
+        query["role"] = role
+    if active_only:
+        query["is_active"] = True
+    users = await db.users.find(query, {"_id": 0, "password_hash": 0, "pin_code": 0}).to_list(100)
+    return users
+
+@api_router.get("/users/{user_id}", response_model=UserResponse)
+async def get_user(user_id: str):
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0, "pin_code": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+@api_router.post("/users", response_model=UserResponse)
+async def create_user(user_data: UserCreate):
+    # Check if username exists
+    existing = await db.users.find_one({"username": user_data.username})
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    
+    user = User(
+        username=user_data.username,
+        password_hash=hash_password(user_data.password),
+        full_name=user_data.full_name,
+        email=user_data.email,
+        phone=user_data.phone,
+        role=user_data.role,
+        pin_code=user_data.pin_code,
+        is_active=user_data.is_active
+    )
+    
+    await db.users.insert_one(user.model_dump())
+    return UserResponse(**user.model_dump())
+
+@api_router.put("/users/{user_id}", response_model=UserResponse)
+async def update_user(user_id: str, user_data: dict = Body(...)):
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    update_data = {k: v for k, v in user_data.items() if k not in ["id", "password_hash", "created_at"]}
+    
+    # Hash password if provided
+    if "password" in update_data and update_data["password"]:
+        update_data["password_hash"] = hash_password(update_data.pop("password"))
+    
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.users.update_one({"id": user_id}, {"$set": update_data})
+    updated = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0, "pin_code": 0})
+    return updated
+
+@api_router.delete("/users/{user_id}")
+async def delete_user(user_id: str):
+    result = await db.users.delete_one({"id": user_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"message": "User deleted"}
+
+@api_router.post("/auth/login")
+async def login(credentials: UserLogin):
+    user = None
+    
+    # Login by PIN
+    if credentials.pin_code:
+        user = await db.users.find_one({"pin_code": credentials.pin_code, "is_active": True})
+    # Login by username/password
+    elif credentials.username and credentials.password:
+        user = await db.users.find_one({"username": credentials.username, "is_active": True})
+        if user and not verify_password(credentials.password, user.get("password_hash", "")):
+            user = None
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    # Update last login
+    await db.users.update_one(
+        {"id": user["id"]}, 
+        {"$set": {"last_login": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {
+        "user": UserResponse(**{k: v for k, v in user.items() if k not in ["password_hash", "pin_code", "_id"]}),
+        "message": "Login successful"
+    }
+
+@api_router.get("/users/{user_id}/stats")
+async def get_user_stats(user_id: str, date_from: Optional[str] = None, date_to: Optional[str] = None):
+    """Get detailed stats for a user/cashier"""
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get shifts for this user
+    shift_query = {"cashier_name": user.get("full_name")}
+    if date_from:
+        shift_query["opened_at"] = {"$gte": date_from}
+    if date_to:
+        shift_query.setdefault("opened_at", {})["$lte"] = date_to
+    
+    shifts = await db.shifts.find(shift_query, {"_id": 0}).to_list(500)
+    
+    # Calculate stats
+    total_shifts = len(shifts)
+    total_sales = sum(s.get("sales_count", 0) for s in shifts)
+    total_revenue = sum(s.get("sales_total", 0) for s in shifts)
+    total_cash = sum(s.get("cash_total", 0) for s in shifts)
+    total_card = sum(s.get("card_total", 0) for s in shifts)
+    total_refunds = sum(s.get("refunds_total", 0) for s in shifts)
+    avg_ticket = total_revenue / total_sales if total_sales > 0 else 0
+    
+    return {
+        "user": UserResponse(**{k: v for k, v in user.items() if k not in ["password_hash", "pin_code", "_id"]}),
+        "stats": {
+            "total_shifts": total_shifts,
+            "total_sales": total_sales,
+            "total_revenue": round(total_revenue, 2),
+            "total_cash": round(total_cash, 2),
+            "total_card": round(total_card, 2),
+            "total_refunds": round(total_refunds, 2),
+            "average_ticket": round(avg_ticket, 2)
+        },
+        "recent_shifts": shifts[-10:]  # Last 10 shifts
+    }
 
 # --- Categories ---
 @api_router.get("/categories", response_model=List[Category])
@@ -562,6 +877,28 @@ async def get_product(product_id: str):
         raise HTTPException(status_code=404, detail="Product not found")
     return product
 
+@api_router.post("/products", response_model=Product)
+async def create_product(product: Product):
+    product_dict = product.model_dump()
+    await db.products.insert_one(product_dict)
+    return product
+
+@api_router.put("/products/{product_id}", response_model=Product)
+async def update_product(product_id: str, data: Dict[str, Any] = Body(...)):
+    data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    await db.products.update_one({"id": product_id}, {"$set": data})
+    updated = await db.products.find_one({"id": product_id}, {"_id": 0})
+    if not updated:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return updated
+
+@api_router.delete("/products/{product_id}")
+async def delete_product(product_id: str):
+    result = await db.products.delete_one({"id": product_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return {"message": "Product deleted"}
+
 # --- Customers ---
 @api_router.get("/customers", response_model=List[Customer])
 async def get_customers(search: Optional[str] = Query(None)):
@@ -592,7 +929,66 @@ async def create_customer(customer: Customer):
 async def update_customer(customer_id: str, data: Dict[str, Any] = Body(...)):
     data["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.customers.update_one({"id": customer_id}, {"$set": data})
-    return await db.customers.find_one({"id": customer_id}, {"_id": 0})
+    updated = await db.customers.find_one({"id": customer_id}, {"_id": 0})
+    if not updated:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return updated
+
+@api_router.delete("/customers/{customer_id}")
+async def delete_customer(customer_id: str):
+    result = await db.customers.delete_one({"id": customer_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return {"message": "Customer deleted"}
+
+@api_router.get("/customers/{customer_id}/history")
+async def get_customer_history(customer_id: str, limit: int = 50):
+    """Get purchase history and documents for a customer"""
+    customer = await db.customers.find_one({"id": customer_id}, {"_id": 0})
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    
+    # Get all documents for this customer
+    documents = await db.documents.find(
+        {"customer_id": customer_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(limit)
+    
+    # Calculate stats
+    total_spent = sum(d.get("total", 0) for d in documents if d.get("status") in ["paid", "partially_paid"])
+    total_documents = len(documents)
+    invoices_count = len([d for d in documents if d.get("doc_type") == "invoice"])
+    quotes_count = len([d for d in documents if d.get("doc_type") == "quote"])
+    receipts_count = len([d for d in documents if d.get("doc_type") == "receipt"])
+    unpaid_amount = sum(d.get("total", 0) - d.get("paid_total", 0) for d in documents if d.get("status") in ["unpaid", "partially_paid"])
+    
+    # Get most purchased products
+    product_counts = {}
+    for doc in documents:
+        for item in doc.get("items", []):
+            pid = item.get("product_id")
+            if pid:
+                if pid not in product_counts:
+                    product_counts[pid] = {"name": item.get("name"), "qty": 0, "total": 0}
+                product_counts[pid]["qty"] += item.get("qty", 0)
+                product_counts[pid]["total"] += item.get("qty", 0) * item.get("unit_price", 0)
+    
+    top_products = sorted(product_counts.values(), key=lambda x: x["total"], reverse=True)[:10]
+    
+    return {
+        "customer": customer,
+        "stats": {
+            "total_spent": round(total_spent, 2),
+            "total_documents": total_documents,
+            "invoices_count": invoices_count,
+            "quotes_count": quotes_count,
+            "receipts_count": receipts_count,
+            "unpaid_amount": round(unpaid_amount, 2),
+            "average_ticket": round(total_spent / total_documents, 2) if total_documents > 0 else 0
+        },
+        "top_products": top_products,
+        "recent_documents": documents[:20]
+    }
 
 # --- Documents (unified) ---
 @api_router.post("/documents", response_model=Document)
@@ -610,12 +1006,28 @@ async def create_document(doc_data: DocumentCreate):
     customer_name = None
     customer_vat = None
     customer_address = None
+    peppol_recipient_id = None
     if doc_data.customer_id:
         customer = await db.customers.find_one({"id": doc_data.customer_id}, {"_id": 0})
         if customer:
             customer_name = customer.get("name")
             customer_vat = customer.get("vat_number")
-            customer_address = f"{customer.get('address', '')}, {customer.get('postal_code', '')} {customer.get('city', '')}"
+            # Build structured address
+            address_parts = []
+            if customer.get("street_name"):
+                addr = customer.get("street_name")
+                if customer.get("building_number"):
+                    addr += f" {customer.get('building_number')}"
+                address_parts.append(addr)
+            elif customer.get("address"):
+                address_parts.append(customer.get("address"))
+            if customer.get("postal_code") or customer.get("city"):
+                address_parts.append(f"{customer.get('postal_code', '')} {customer.get('city', '')}".strip())
+            customer_address = ", ".join(address_parts) if address_parts else None
+            
+            # Set Peppol recipient if customer has Peppol enabled
+            if customer.get("receive_invoices_by_peppol") and customer.get("peppol_id"):
+                peppol_recipient_id = customer.get("peppol_id")
     
     # Process payments
     payments = []
@@ -659,7 +1071,8 @@ async def create_document(doc_data: DocumentCreate):
         due_date=doc_data.due_date,
         payment_terms=doc_data.payment_terms,
         source_document_id=doc_data.source_document_id,
-        shift_id=shift_id
+        shift_id=shift_id,
+        peppol_recipient_id=peppol_recipient_id
     )
     
     doc_dict = doc.model_dump()
@@ -1098,22 +1511,6 @@ async def get_sales_legacy(limit: int = Query(50)):
     ).sort("created_at", -1).to_list(limit)
     return docs
 
-# --- Peppol Placeholder ---
-@api_router.post("/documents/{doc_id}/send-peppol")
-async def send_peppol(doc_id: str):
-    """Placeholder for Peppol e-invoicing"""
-    doc = await db.documents.find_one({"id": doc_id}, {"_id": 0})
-    if not doc:
-        raise HTTPException(status_code=404, detail="Document not found")
-    
-    # TODO: Implement actual Peppol UBL XML generation and sending
-    await db.documents.update_one(
-        {"id": doc_id},
-        {"$set": {"peppol_status": "pending", "updated_at": datetime.now(timezone.utc).isoformat()}}
-    )
-    
-    return {"status": "pending", "message": "Peppol integration not yet implemented"}
-
 # --- PDF Generation ---
 @api_router.get("/documents/{doc_id}/pdf")
 async def generate_document_pdf(doc_id: str):
@@ -1132,7 +1529,7 @@ async def generate_document_pdf(doc_id: str):
     c.drawString(50, height - 50, "ALPHA&CO BOUWMATERIALEN & DESIGN")
     c.setFont("Helvetica", 9)
     c.drawString(50, height - 65, "Ninoofsesteenweg 77-79, 1700 Dilbeek")
-    c.drawString(50, height - 78, "TVA: BE 1028.386.674")
+    c.drawString(50, height - 78, "TVA: BE 1028.386.674 | Tél: +32 2 449 81 22")
     
     # Document info
     c.setFont("Helvetica-Bold", 14)
@@ -1250,6 +1647,394 @@ async def generate_document_pdf(doc_id: str):
         headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
 
+# --- Company Settings Endpoints ---
+@api_router.get("/company-settings")
+async def get_company_settings():
+    """Get company settings for invoicing and Peppol"""
+    settings = await db.company_settings.find_one({}, {"_id": 0})
+    if not settings:
+        # Return default settings
+        default = CompanySettings()
+        return default.model_dump()
+    return settings
+
+@api_router.post("/company-settings")
+async def update_company_settings(settings_data: dict = Body(...)):
+    """Update company settings"""
+    existing = await db.company_settings.find_one({})
+    
+    settings_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    if existing:
+        await db.company_settings.update_one(
+            {"id": existing["id"]},
+            {"$set": settings_data}
+        )
+        updated = await db.company_settings.find_one({"id": existing["id"]}, {"_id": 0})
+        return updated
+    else:
+        settings_data["id"] = str(uuid.uuid4())
+        await db.company_settings.insert_one(settings_data)
+        return settings_data
+
+# --- Peppyrus/Peppol Integration Endpoints ---
+@api_router.get("/peppyrus/settings")
+async def get_peppyrus_settings():
+    """Get Peppyrus API settings for Peppol integration"""
+    settings = await db.peppyrus_settings.find_one({}, {"_id": 0})
+    if not settings:
+        default = PeppyrusSettings()
+        return default.model_dump()
+    # Mask sensitive data
+    if settings.get("api_secret"):
+        settings["api_secret"] = "***" + settings["api_secret"][-4:] if len(settings.get("api_secret", "")) > 4 else "****"
+    return settings
+
+@api_router.post("/peppyrus/settings")
+async def update_peppyrus_settings(settings_data: dict = Body(...)):
+    """Update Peppyrus settings"""
+    existing = await db.peppyrus_settings.find_one({})
+    
+    settings_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    if existing:
+        # Don't update secret if masked
+        if settings_data.get("api_secret", "").startswith("***"):
+            del settings_data["api_secret"]
+        
+        await db.peppyrus_settings.update_one(
+            {"id": existing["id"]},
+            {"$set": settings_data}
+        )
+        updated = await db.peppyrus_settings.find_one({"id": existing["id"]}, {"_id": 0})
+        return updated
+    else:
+        settings_data["id"] = str(uuid.uuid4())
+        await db.peppyrus_settings.insert_one(settings_data)
+        return settings_data
+
+@api_router.post("/peppyrus/test-connection")
+async def test_peppyrus_connection():
+    """Test connection to Peppyrus API"""
+    import requests
+    
+    settings = await db.peppyrus_settings.find_one({}, {"_id": 0})
+    if not settings or not settings.get("api_key"):
+        raise HTTPException(status_code=400, detail="Peppyrus not configured")
+    
+    try:
+        # Test API connection
+        response = requests.get(
+            f"{settings['api_url']}/api/v1/status",
+            headers={"Authorization": f"Bearer {settings['api_key']}"},
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            return {"status": "connected", "message": "Connexion Peppyrus réussie"}
+        else:
+            return {"status": "error", "message": f"Erreur API: {response.status_code}"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@api_router.post("/documents/{document_id}/send-peppol")
+async def send_document_to_peppol(document_id: str):
+    """Send invoice to Peppol network via Peppyrus"""
+    import requests
+    
+    # Get document
+    doc = await db.documents.find_one({"id": document_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    if doc["doc_type"] not in ["invoice", "credit_note"]:
+        raise HTTPException(status_code=400, detail="Only invoices and credit notes can be sent via Peppol")
+    
+    if doc.get("peppol_sent"):
+        raise HTTPException(status_code=400, detail="Document already sent via Peppol")
+    
+    # Get Peppyrus settings
+    peppyrus = await db.peppyrus_settings.find_one({}, {"_id": 0})
+    if not peppyrus or not peppyrus.get("enabled"):
+        raise HTTPException(status_code=400, detail="Peppyrus not configured or disabled")
+    
+    # Get company settings
+    company = await db.company_settings.find_one({}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=400, detail="Company settings not configured")
+    
+    # Get customer
+    customer = None
+    if doc.get("customer_id"):
+        customer = await db.customers.find_one({"id": doc["customer_id"]}, {"_id": 0})
+    
+    if not customer:
+        raise HTTPException(status_code=400, detail="Customer not found")
+    
+    # Check for Peppol ID
+    peppol_recipient = customer.get("peppol_id") or doc.get("peppol_recipient_id")
+    if not peppol_recipient:
+        raise HTTPException(status_code=400, detail="Customer has no Peppol ID configured")
+    
+    # Generate UBL XML
+    ubl_xml = generate_ubl_invoice(doc, company, customer)
+    
+    try:
+        # Send to Peppyrus
+        api_url = peppyrus.get('api_url', 'https://api.peppyrus.com')
+        response = requests.post(
+            f"{api_url}/api/v1/documents/send",
+            headers={
+                "Authorization": f"Bearer {peppyrus['api_key']}",
+                "Content-Type": "application/xml",
+                "X-Sender-ID": peppyrus.get('sender_id', company.get('peppol_id', '')),
+                "X-Recipient-ID": peppol_recipient
+            },
+            data=ubl_xml,
+            timeout=30
+        )
+        
+        if response.status_code in [200, 201, 202]:
+            result = response.json()
+            peppol_message_id = result.get("document_id") or result.get("message_id") or result.get("id")
+            
+            # Update document with Peppol status
+            await db.documents.update_one(
+                {"id": document_id},
+                {"$set": {
+                    "peppol_status": "sent",
+                    "peppol_sent": True,
+                    "peppol_sent_at": datetime.now(timezone.utc).isoformat(),
+                    "peppol_message_id": peppol_message_id,
+                    "peppol_recipient_id": peppol_recipient,
+                    "peppol_delivery_status": "pending",
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            return {
+                "status": "success", 
+                "peppol_message_id": peppol_message_id,
+                "recipient": peppol_recipient
+            }
+        else:
+            await db.documents.update_one(
+                {"id": document_id},
+                {"$set": {
+                    "peppol_status": "failed", 
+                    "peppol_delivery_status": f"Error: {response.status_code}",
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            raise HTTPException(status_code=500, detail=f"Peppol sending failed: {response.text}")
+    
+    except requests.RequestException as e:
+        await db.documents.update_one(
+            {"id": document_id},
+            {"$set": {
+                "peppol_status": "failed", 
+                "peppol_delivery_status": f"Network error: {str(e)}",
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        raise HTTPException(status_code=500, detail=f"Network error: {str(e)}")
+
+def generate_ubl_invoice(doc: dict, company: dict, customer: dict) -> str:
+    """Generate UBL 2.1 XML for Peppol BIS Billing 3.0"""
+    from xml.etree.ElementTree import Element, SubElement, tostring
+    from xml.dom import minidom
+    
+    # Namespaces
+    ns = {
+        "": "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2",
+        "cac": "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2",
+        "cbc": "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
+    }
+    
+    # Root element
+    invoice = Element("Invoice", xmlns=ns[""])
+    invoice.set("xmlns:cac", ns["cac"])
+    invoice.set("xmlns:cbc", ns["cbc"])
+    
+    # Customization and Profile ID (Peppol BIS Billing 3.0)
+    SubElement(invoice, "{%s}CustomizationID" % ns["cbc"]).text = "urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0"
+    SubElement(invoice, "{%s}ProfileID" % ns["cbc"]).text = "urn:fdc:peppol.eu:2017:poacc:billing:01:1.0"
+    
+    # Document info
+    SubElement(invoice, "{%s}ID" % ns["cbc"]).text = doc["number"]
+    SubElement(invoice, "{%s}IssueDate" % ns["cbc"]).text = doc["created_at"][:10]
+    
+    # Due date
+    if doc.get("due_date"):
+        SubElement(invoice, "{%s}DueDate" % ns["cbc"]).text = doc["due_date"][:10]
+    
+    # Invoice type code (380 = Invoice, 381 = Credit Note)
+    type_code = "381" if doc["doc_type"] == "credit_note" else "380"
+    SubElement(invoice, "{%s}InvoiceTypeCode" % ns["cbc"]).text = type_code
+    
+    # Currency
+    SubElement(invoice, "{%s}DocumentCurrencyCode" % ns["cbc"]).text = "EUR"
+    
+    # Supplier (AccountingSupplierParty)
+    supplier_party = SubElement(invoice, "{%s}AccountingSupplierParty" % ns["cac"])
+    supplier = SubElement(supplier_party, "{%s}Party" % ns["cac"])
+    
+    # Supplier Endpoint
+    endpoint = SubElement(supplier, "{%s}EndpointID" % ns["cbc"])
+    endpoint.set("schemeID", "0208")
+    endpoint.text = company.get("vat_number", "").replace("BE", "")
+    
+    # Supplier Name
+    party_name = SubElement(supplier, "{%s}PartyName" % ns["cac"])
+    SubElement(party_name, "{%s}Name" % ns["cbc"]).text = company.get("company_name", "")
+    
+    # Supplier Address
+    postal_addr = SubElement(supplier, "{%s}PostalAddress" % ns["cac"])
+    SubElement(postal_addr, "{%s}StreetName" % ns["cbc"]).text = company.get("street_name", company.get("address_line", ""))
+    SubElement(postal_addr, "{%s}CityName" % ns["cbc"]).text = company.get("city", "")
+    SubElement(postal_addr, "{%s}PostalZone" % ns["cbc"]).text = company.get("postal_code", "")
+    country = SubElement(postal_addr, "{%s}Country" % ns["cac"])
+    SubElement(country, "{%s}IdentificationCode" % ns["cbc"]).text = company.get("country", "BE")
+    
+    # Supplier VAT
+    tax_scheme = SubElement(supplier, "{%s}PartyTaxScheme" % ns["cac"])
+    SubElement(tax_scheme, "{%s}CompanyID" % ns["cbc"]).text = company.get("vat_number", "")
+    tax_scheme_id = SubElement(tax_scheme, "{%s}TaxScheme" % ns["cac"])
+    SubElement(tax_scheme_id, "{%s}ID" % ns["cbc"]).text = "VAT"
+    
+    # Supplier Legal Entity
+    legal = SubElement(supplier, "{%s}PartyLegalEntity" % ns["cac"])
+    SubElement(legal, "{%s}RegistrationName" % ns["cbc"]).text = company.get("legal_name", company.get("company_name", ""))
+    SubElement(legal, "{%s}CompanyID" % ns["cbc"]).text = company.get("company_id", "")
+    
+    # Customer (AccountingCustomerParty)
+    customer_party = SubElement(invoice, "{%s}AccountingCustomerParty" % ns["cac"])
+    cust = SubElement(customer_party, "{%s}Party" % ns["cac"])
+    
+    # Customer Endpoint
+    cust_endpoint = SubElement(cust, "{%s}EndpointID" % ns["cbc"])
+    cust_endpoint.set("schemeID", "0208")
+    cust_endpoint.text = customer.get("peppol_id", "").split(":")[-1] if customer.get("peppol_id") else ""
+    
+    # Customer Name
+    cust_party_name = SubElement(cust, "{%s}PartyName" % ns["cac"])
+    SubElement(cust_party_name, "{%s}Name" % ns["cbc"]).text = customer.get("name", "")
+    
+    # Customer Address
+    cust_postal = SubElement(cust, "{%s}PostalAddress" % ns["cac"])
+    SubElement(cust_postal, "{%s}StreetName" % ns["cbc"]).text = customer.get("street_name", customer.get("address", ""))
+    SubElement(cust_postal, "{%s}CityName" % ns["cbc"]).text = customer.get("city", "")
+    SubElement(cust_postal, "{%s}PostalZone" % ns["cbc"]).text = customer.get("postal_code", "")
+    cust_country = SubElement(cust_postal, "{%s}Country" % ns["cac"])
+    SubElement(cust_country, "{%s}IdentificationCode" % ns["cbc"]).text = customer.get("country", "BE")
+    
+    # Customer VAT
+    if customer.get("vat_number"):
+        cust_tax = SubElement(cust, "{%s}PartyTaxScheme" % ns["cac"])
+        SubElement(cust_tax, "{%s}CompanyID" % ns["cbc"]).text = customer.get("vat_number", "")
+        cust_tax_scheme = SubElement(cust_tax, "{%s}TaxScheme" % ns["cac"])
+        SubElement(cust_tax_scheme, "{%s}ID" % ns["cbc"]).text = "VAT"
+    
+    # Customer Legal Entity
+    cust_legal = SubElement(cust, "{%s}PartyLegalEntity" % ns["cac"])
+    SubElement(cust_legal, "{%s}RegistrationName" % ns["cbc"]).text = customer.get("name", "")
+    
+    # Payment Means
+    payment = SubElement(invoice, "{%s}PaymentMeans" % ns["cac"])
+    SubElement(payment, "{%s}PaymentMeansCode" % ns["cbc"]).text = "30"  # Credit transfer
+    
+    if company.get("bank_account_iban"):
+        payee_account = SubElement(payment, "{%s}PayeeFinancialAccount" % ns["cac"])
+        SubElement(payee_account, "{%s}ID" % ns["cbc"]).text = company.get("bank_account_iban", "")
+        if company.get("bank_account_bic"):
+            fin_inst = SubElement(payee_account, "{%s}FinancialInstitutionBranch" % ns["cac"])
+            SubElement(fin_inst, "{%s}ID" % ns["cbc"]).text = company.get("bank_account_bic", "")
+    
+    # Tax Total
+    tax_total = SubElement(invoice, "{%s}TaxTotal" % ns["cac"])
+    tax_amount = SubElement(tax_total, "{%s}TaxAmount" % ns["cbc"])
+    tax_amount.set("currencyID", "EUR")
+    tax_amount.text = f"{doc.get('vat_total', 0):.2f}"
+    
+    # Group items by VAT rate
+    vat_groups = {}
+    for item in doc.get("items", []):
+        rate = item.get("vat_rate", 21)
+        if rate not in vat_groups:
+            vat_groups[rate] = {"base": 0, "vat": 0}
+        vat_groups[rate]["base"] += item.get("line_subtotal", 0)
+        vat_groups[rate]["vat"] += item.get("line_vat", 0)
+    
+    for rate, amounts in vat_groups.items():
+        subtotal = SubElement(tax_total, "{%s}TaxSubtotal" % ns["cac"])
+        taxable = SubElement(subtotal, "{%s}TaxableAmount" % ns["cbc"])
+        taxable.set("currencyID", "EUR")
+        taxable.text = f"{amounts['base']:.2f}"
+        
+        tax_amt = SubElement(subtotal, "{%s}TaxAmount" % ns["cbc"])
+        tax_amt.set("currencyID", "EUR")
+        tax_amt.text = f"{amounts['vat']:.2f}"
+        
+        tax_cat = SubElement(subtotal, "{%s}TaxCategory" % ns["cac"])
+        SubElement(tax_cat, "{%s}ID" % ns["cbc"]).text = "S"
+        SubElement(tax_cat, "{%s}Percent" % ns["cbc"]).text = str(rate)
+        cat_scheme = SubElement(tax_cat, "{%s}TaxScheme" % ns["cac"])
+        SubElement(cat_scheme, "{%s}ID" % ns["cbc"]).text = "VAT"
+    
+    # Legal Monetary Total
+    monetary = SubElement(invoice, "{%s}LegalMonetaryTotal" % ns["cac"])
+    
+    line_ext = SubElement(monetary, "{%s}LineExtensionAmount" % ns["cbc"])
+    line_ext.set("currencyID", "EUR")
+    line_ext.text = f"{doc.get('subtotal', 0):.2f}"
+    
+    tax_excl = SubElement(monetary, "{%s}TaxExclusiveAmount" % ns["cbc"])
+    tax_excl.set("currencyID", "EUR")
+    tax_excl.text = f"{doc.get('subtotal', 0):.2f}"
+    
+    tax_incl = SubElement(monetary, "{%s}TaxInclusiveAmount" % ns["cbc"])
+    tax_incl.set("currencyID", "EUR")
+    tax_incl.text = f"{doc.get('total', 0):.2f}"
+    
+    payable = SubElement(monetary, "{%s}PayableAmount" % ns["cbc"])
+    payable.set("currencyID", "EUR")
+    payable.text = f"{doc.get('total', 0) - doc.get('paid_total', 0):.2f}"
+    
+    # Invoice Lines
+    for idx, item in enumerate(doc.get("items", []), 1):
+        line = SubElement(invoice, "{%s}InvoiceLine" % ns["cac"])
+        SubElement(line, "{%s}ID" % ns["cbc"]).text = str(idx)
+        
+        qty = SubElement(line, "{%s}InvoicedQuantity" % ns["cbc"])
+        qty.set("unitCode", "C62")  # One (piece)
+        qty.text = str(item.get("qty", 1))
+        
+        line_amt = SubElement(line, "{%s}LineExtensionAmount" % ns["cbc"])
+        line_amt.set("currencyID", "EUR")
+        line_amt.text = f"{item.get('line_subtotal', 0):.2f}"
+        
+        # Item
+        inv_item = SubElement(line, "{%s}Item" % ns["cac"])
+        SubElement(inv_item, "{%s}Name" % ns["cbc"]).text = item.get("name", "")[:100]
+        
+        # Item VAT
+        item_tax = SubElement(inv_item, "{%s}ClassifiedTaxCategory" % ns["cac"])
+        SubElement(item_tax, "{%s}ID" % ns["cbc"]).text = "S"
+        SubElement(item_tax, "{%s}Percent" % ns["cbc"]).text = str(item.get("vat_rate", 21))
+        item_scheme = SubElement(item_tax, "{%s}TaxScheme" % ns["cac"])
+        SubElement(item_scheme, "{%s}ID" % ns["cbc"]).text = "VAT"
+        
+        # Price
+        price = SubElement(line, "{%s}Price" % ns["cac"])
+        price_amt = SubElement(price, "{%s}PriceAmount" % ns["cbc"])
+        price_amt.set("currencyID", "EUR")
+        price_amt.text = f"{item.get('unit_price', 0):.2f}"
+    
+    # Convert to string
+    xml_str = tostring(invoice, encoding="unicode")
+    # Pretty print
+    parsed = minidom.parseString(xml_str)
+    return parsed.toprettyxml(indent="  ")
+
 # --- Shopify Integration Endpoints ---
 @api_router.get("/shopify/settings")
 async def get_shopify_settings():
@@ -1281,60 +2066,467 @@ async def create_or_update_shopify_settings(settings_data: ShopifySettingsUpdate
 
 @api_router.post("/shopify/sync/products")
 async def sync_shopify_products():
-    """Import products from Shopify (MVP: manual trigger only)"""
+    """Import products from Shopify including collections as categories"""
+    import requests
+    from requests.auth import HTTPBasicAuth
+    
     settings = await db.shopify_settings.find_one({}, {"_id": 0})
     if not settings or not settings.get("import_products_enabled"):
         raise HTTPException(status_code=400, detail="Shopify not configured or product import disabled")
     
-    # TODO: Actual Shopify API integration
-    # For MVP, this is a placeholder that logs the sync attempt
-    log = ShopifySyncLog(
-        sync_type="product_import",
-        status=ShopifySyncStatus.SUCCESS,
-        items_processed=0,
-        items_succeeded=0,
-        items_failed=0,
-        details={"message": "Shopify API integration pending"}
-    )
-    await db.shopify_sync_logs.insert_one(log.model_dump())
-    
-    await db.shopify_settings.update_one(
-        {"id": settings["id"]},
-        {"$set": {"last_product_sync": datetime.now(timezone.utc).isoformat()}}
-    )
-    
-    return {"status": "success", "message": "Product sync placeholder executed"}
+    try:
+        store_domain = settings["store_domain"]
+        
+        # Determine authentication method - prioritize access_token
+        if settings.get("access_token"):
+            # Use Access Token (preferred method)
+            headers = {
+                "X-Shopify-Access-Token": settings["access_token"],
+                "Content-Type": "application/json"
+            }
+            auth = None
+        elif settings.get("api_key") and settings.get("api_secret"):
+            # Use Basic Auth with API Key and Password (legacy)
+            auth = HTTPBasicAuth(settings["api_key"], settings["api_secret"])
+            headers = {"Content-Type": "application/json"}
+        else:
+            raise HTTPException(status_code=400, detail="No valid authentication credentials")
+        
+        items_processed = 0
+        items_succeeded = 0
+        items_failed = 0
+        
+        # ============ SYNC COLLECTIONS AS CATEGORIES FIRST ============
+        collection_to_category = {}  # Map collection_id -> category_id
+        product_collections = {}  # Map product_id -> [collection_ids]
+        
+        # Fetch custom collections
+        try:
+            collections_url = f"https://{store_domain}/admin/api/2024-01/custom_collections.json?limit=250"
+            if auth:
+                coll_response = requests.get(collections_url, auth=auth, headers=headers)
+            else:
+                coll_response = requests.get(collections_url, headers=headers)
+            
+            if coll_response.status_code == 200:
+                custom_collections = coll_response.json().get("custom_collections", [])
+                for coll in custom_collections:
+                    coll_id = str(coll["id"])
+                    coll_name = coll.get("title", "Collection")
+                    
+                    # Check if category exists
+                    existing_cat = await db.categories.find_one({
+                        "$or": [
+                            {"name_fr": {"$regex": f"^{coll_name}$", "$options": "i"}},
+                            {"shopify_collection_id": coll_id}
+                        ]
+                    })
+                    
+                    if existing_cat:
+                        collection_to_category[coll_id] = existing_cat["id"]
+                    else:
+                        new_cat = Category(
+                            id=str(uuid.uuid4()),
+                            name_fr=coll_name,
+                            name_nl=coll_name,
+                            description=f"Shopify Collection: {coll_name}",
+                            active=True
+                        )
+                        cat_data = new_cat.model_dump()
+                        cat_data["shopify_collection_id"] = coll_id
+                        await db.categories.insert_one(cat_data)
+                        collection_to_category[coll_id] = new_cat.id
+                    
+                    # Fetch products in this collection (collects)
+                    collects_url = f"https://{store_domain}/admin/api/2024-01/collects.json?collection_id={coll_id}&limit=250"
+                    if auth:
+                        collects_resp = requests.get(collects_url, auth=auth, headers=headers)
+                    else:
+                        collects_resp = requests.get(collects_url, headers=headers)
+                    
+                    if collects_resp.status_code == 200:
+                        for collect in collects_resp.json().get("collects", []):
+                            prod_id = str(collect["product_id"])
+                            if prod_id not in product_collections:
+                                product_collections[prod_id] = []
+                            product_collections[prod_id].append(coll_id)
+                            
+            logger.info(f"Synced {len(collection_to_category)} collections as categories")
+        except Exception as coll_error:
+            logger.warning(f"Could not sync collections: {coll_error}")
+        
+        # Fetch smart collections too
+        try:
+            smart_url = f"https://{store_domain}/admin/api/2024-01/smart_collections.json?limit=250"
+            if auth:
+                smart_response = requests.get(smart_url, auth=auth, headers=headers)
+            else:
+                smart_response = requests.get(smart_url, headers=headers)
+            
+            if smart_response.status_code == 200:
+                smart_collections = smart_response.json().get("smart_collections", [])
+                for coll in smart_collections:
+                    coll_id = str(coll["id"])
+                    coll_name = coll.get("title", "Smart Collection")
+                    
+                    existing_cat = await db.categories.find_one({
+                        "$or": [
+                            {"name_fr": {"$regex": f"^{coll_name}$", "$options": "i"}},
+                            {"shopify_collection_id": coll_id}
+                        ]
+                    })
+                    
+                    if existing_cat:
+                        collection_to_category[coll_id] = existing_cat["id"]
+                    else:
+                        new_cat = Category(
+                            id=str(uuid.uuid4()),
+                            name_fr=coll_name,
+                            name_nl=coll_name,
+                            description=f"Shopify Smart Collection: {coll_name}",
+                            active=True
+                        )
+                        cat_data = new_cat.model_dump()
+                        cat_data["shopify_collection_id"] = coll_id
+                        await db.categories.insert_one(cat_data)
+                        collection_to_category[coll_id] = new_cat.id
+        except Exception as smart_error:
+            logger.warning(f"Could not sync smart collections: {smart_error}")
+        
+        # ============ SYNC PRODUCTS ============
+        # Pagination: Fetch all products
+        page_info = None
+        has_next_page = True
+        
+        while has_next_page:
+            # Build URL with pagination
+            if page_info:
+                api_url = f"https://{store_domain}/admin/api/2024-01/products.json?limit=250&page_info={page_info}"
+            else:
+                api_url = f"https://{store_domain}/admin/api/2024-01/products.json?limit=250"
+            
+            # Make request
+            if auth:
+                response = requests.get(api_url, auth=auth, headers=headers)
+            else:
+                response = requests.get(api_url, headers=headers)
+            
+            response.raise_for_status()
+            
+            shopify_products = response.json().get("products", [])
+            
+            # Check for next page in Link header
+            link_header = response.headers.get("Link", "")
+            has_next_page = 'rel="next"' in link_header
+            
+            if has_next_page:
+                # Extract page_info from Link header
+                import re
+                next_link = re.search(r'<([^>]+)>;\s*rel="next"', link_header)
+                if next_link:
+                    next_url = next_link.group(1)
+                    page_info_match = re.search(r'page_info=([^&]+)', next_url)
+                    if page_info_match:
+                        page_info = page_info_match.group(1)
+        
+            for shop_product in shopify_products:
+                # Get product image (first image or variant-specific image)
+                product_image = None
+                if shop_product.get("images") and len(shop_product["images"]) > 0:
+                    product_image = shop_product["images"][0].get("src")
+                
+                # Map Shopify product_type to POS category
+                shopify_category_name = shop_product.get("product_type") or shop_product.get("vendor") or "Default"
+                category_id = "default"
+                
+                if shopify_category_name:
+                    # Try to find existing category by name (case-insensitive)
+                    existing_category = await db.categories.find_one({
+                        "$or": [
+                            {"name_fr": {"$regex": f"^{shopify_category_name}$", "$options": "i"}},
+                            {"name_nl": {"$regex": f"^{shopify_category_name}$", "$options": "i"}}
+                        ]
+                    })
+                    
+                    if existing_category:
+                        category_id = existing_category["id"]
+                    else:
+                        # Create new category from Shopify product_type
+                        new_category = Category(
+                            id=str(uuid.uuid4()),
+                            name_fr=shopify_category_name,
+                            name_nl=shopify_category_name,
+                            description=f"Imported from Shopify: {shopify_category_name}",
+                            active=True
+                        )
+                        await db.categories.insert_one(new_category.model_dump())
+                        category_id = new_category.id
+                
+                for variant in shop_product.get("variants", []):
+                    items_processed += 1
+                    
+                    # Check if product already exists by SKU or Shopify ID
+                    existing = await db.products.find_one({
+                        "$or": [
+                            {"shopify_variant_id": str(variant["id"])},
+                            {"sku": variant.get("sku")} if variant.get("sku") else {}
+                        ]
+                    })
+                    
+                    # Get variant-specific image if available, otherwise use product image
+                    variant_image = product_image
+                    if variant.get("image_id") and shop_product.get("images"):
+                        for img in shop_product["images"]:
+                            if img.get("id") == variant.get("image_id"):
+                                variant_image = img.get("src")
+                                break
+                    
+                    # Extract weight (convert to kg)
+                    weight = variant.get("weight")
+                    weight_unit = variant.get("weight_unit", "kg")
+                    if weight and weight_unit == "g":
+                        weight = weight / 1000
+                        weight_unit = "kg"
+                    elif weight and weight_unit == "lb":
+                        weight = weight * 0.453592
+                        weight_unit = "kg"
+                    
+                    # Get barcode/EAN - prioritize barcode field
+                    barcode_value = variant.get("barcode") or ""
+                    gtin_value = barcode_value if barcode_value and len(barcode_value) >= 8 else None
+                    
+                    # Build variant title for multi-variant products
+                    variant_title = shop_product["title"]
+                    variant_options_str = None
+                    if variant.get("title") and variant.get("title") != "Default Title":
+                        variant_title = f"{shop_product['title']} - {variant['title']}"
+                        variant_options_str = variant.get("title")
+                    
+                    # Extract variant options (option1, option2, option3 = size, color, etc.)
+                    option1 = variant.get("option1")  # Usually size
+                    option2 = variant.get("option2")  # Usually color
+                    option3 = variant.get("option3")  # Other attribute
+                    
+                    # Get option names from product options
+                    product_options = shop_product.get("options", [])
+                    option_names = {i+1: opt.get("name", f"Option {i+1}") for i, opt in enumerate(product_options)}
+                    
+                    # Build metafields from variant options
+                    metafields = {}
+                    if option1 and option_names.get(1):
+                        metafields[option_names[1].lower()] = option1
+                    if option2 and option_names.get(2):
+                        metafields[option_names[2].lower()] = option2
+                    if option3 and option_names.get(3):
+                        metafields[option_names[3].lower()] = option3
+                    
+                    # Determine category: prefer collection, then product_type
+                    shop_product_id = str(shop_product["id"])
+                    final_category_id = category_id  # Default from product_type
+                    collection_ids_list = []
+                    
+                    if shop_product_id in product_collections and product_collections[shop_product_id]:
+                        collection_ids_list = product_collections[shop_product_id]
+                        # Use first collection as primary category
+                        first_collection_id = collection_ids_list[0]
+                        if first_collection_id in collection_to_category:
+                            final_category_id = collection_to_category[first_collection_id]
+                    
+                    product_data = {
+                        "name_fr": variant_title,
+                        "name_nl": variant_title,
+                        "description_fr": shop_product.get("body_html", "")[:500] if shop_product.get("body_html") else None,
+                        "description_nl": shop_product.get("body_html", "")[:500] if shop_product.get("body_html") else None,
+                        "sku": variant.get("sku") or f"SHOP-{variant['id']}",
+                        "barcode": barcode_value,
+                        "gtin": gtin_value,  # EAN-13, UPC, etc.
+                        "price_retail": float(variant.get("price", 0)),
+                        "compare_at_price": float(variant.get("compare_at_price")) if variant.get("compare_at_price") else None,
+                        "cost_price": float(variant.get("inventory_item", {}).get("cost")) if variant.get("inventory_item", {}).get("cost") else None,
+                        "unit": "piece",  # Default unit
+                        "stock_qty": variant.get("inventory_quantity", 0),
+                        "category_id": final_category_id,
+                        # Physical attributes
+                        "weight": weight,
+                        "weight_unit": weight_unit,
+                        # Variant options as attributes
+                        "size": option1 if option_names.get(1, "").lower() in ["size", "taille", "maat", "größe"] else None,
+                        "color": option2 if option_names.get(2, "").lower() in ["color", "colour", "couleur", "kleur", "farbe"] else (option1 if option_names.get(1, "").lower() in ["color", "colour", "couleur", "kleur", "farbe"] else None),
+                        "variant_title": variant_options_str,
+                        "metafields": metafields if metafields else None,
+                        "collection_ids": collection_ids_list if collection_ids_list else None,
+                        # Shopify specific
+                        "vendor": shop_product.get("vendor"),
+                        "tags": shop_product.get("tags"),  # Comma-separated
+                        "product_type": shop_product.get("product_type"),
+                        "image_url": variant_image,
+                        "origin": ProductOrigin.SHOPIFY,
+                        "shopify_product_id": str(shop_product["id"]),
+                        "shopify_variant_id": str(variant["id"]),
+                        "shopify_inventory_item_id": str(variant.get("inventory_item_id")) if variant.get("inventory_item_id") else None,
+                        "updated_at": datetime.now(timezone.utc).isoformat()
+                    }
+                    
+                    if existing:
+                        # Update existing product
+                        await db.products.update_one(
+                            {"id": existing["id"]},
+                            {"$set": product_data}
+                        )
+                        items_succeeded += 1
+                    else:
+                        # Create new product
+                        new_product = Product(
+                            id=str(uuid.uuid4()),
+                            **product_data,
+                            created_at=datetime.now(timezone.utc).isoformat()
+                        )
+                        await db.products.insert_one(new_product.model_dump())
+                        items_succeeded += 1
+        
+        # Log success
+        log = ShopifySyncLog(
+            sync_type="product_import",
+            status=ShopifySyncStatus.SUCCESS,
+            items_processed=items_processed,
+            items_succeeded=items_succeeded,
+            items_failed=items_failed,
+            details={"products_imported": items_succeeded}
+        )
+        await db.shopify_sync_logs.insert_one(log.model_dump())
+        
+        await db.shopify_settings.update_one(
+            {"id": settings["id"]},
+            {"$set": {"last_product_sync": datetime.now(timezone.utc).isoformat()}}
+        )
+        
+        return {
+            "status": "success", 
+            "items_processed": items_processed,
+            "items_succeeded": items_succeeded,
+            "items_failed": items_failed
+        }
+        
+    except Exception as e:
+        logger.error(f"Shopify sync error: {str(e)}")
+        
+        # Log failure
+        log = ShopifySyncLog(
+            sync_type="product_import",
+            status=ShopifySyncStatus.FAILED,
+            items_processed=0,
+            items_succeeded=0,
+            items_failed=0,
+            error_message=str(e),
+            details={"error": str(e)}
+        )
+        await db.shopify_sync_logs.insert_one(log.model_dump())
+        
+        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
 
 @api_router.post("/shopify/sync/stock")
 async def sync_stock_to_shopify():
-    """Push stock quantities to Shopify (batch operation)"""
+    """Push stock quantities to Shopify"""
+    import requests
+    
     settings = await db.shopify_settings.find_one({}, {"_id": 0})
     if not settings or not settings.get("export_stock_enabled"):
         raise HTTPException(status_code=400, detail="Shopify not configured or stock export disabled")
     
-    # Get all products with Shopify mapping
-    products = await db.products.find(
-        {"shopify_variant_id": {"$ne": None}},
-        {"_id": 0}
-    ).to_list(1000)
-    
-    # TODO: Actual Shopify API stock update
-    log = ShopifySyncLog(
-        sync_type="stock_export",
-        status=ShopifySyncStatus.SUCCESS,
-        items_processed=len(products),
-        items_succeeded=len(products),
-        items_failed=0,
-        details={"message": f"Found {len(products)} mapped products for stock sync"}
-    )
-    await db.shopify_sync_logs.insert_one(log.model_dump())
-    
-    await db.shopify_settings.update_one(
-        {"id": settings["id"]},
-        {"$set": {"last_stock_sync": datetime.now(timezone.utc).isoformat()}}
-    )
-    
-    return {"status": "success", "items_synced": len(products)}
+    try:
+        headers = {
+            "X-Shopify-Access-Token": settings["access_token"],
+            "Content-Type": "application/json"
+        }
+        
+        store_domain = settings["store_domain"]
+        
+        # Get all products with Shopify mapping
+        products = await db.products.find(
+            {"shopify_variant_id": {"$ne": None, "$exists": True}},
+            {"_id": 0}
+        ).to_list(1000)
+        
+        items_processed = 0
+        items_succeeded = 0
+        items_failed = 0
+        
+        for product in products:
+            items_processed += 1
+            variant_id = product.get("shopify_variant_id")
+            
+            try:
+                # Get inventory item ID from variant
+                variant_url = f"https://{store_domain}/admin/api/2024-01/variants/{variant_id}.json"
+                variant_response = requests.get(variant_url, headers=headers)
+                variant_response.raise_for_status()
+                
+                inventory_item_id = variant_response.json()["variant"]["inventory_item_id"]
+                
+                # Get location ID (first location)
+                locations_url = f"https://{store_domain}/admin/api/2024-01/locations.json"
+                locations_response = requests.get(locations_url, headers=headers)
+                locations_response.raise_for_status()
+                
+                locations = locations_response.json().get("locations", [])
+                if not locations:
+                    continue
+                    
+                location_id = locations[0]["id"]
+                
+                # Update inventory level
+                inventory_url = f"https://{store_domain}/admin/api/2024-01/inventory_levels/set.json"
+                inventory_data = {
+                    "location_id": location_id,
+                    "inventory_item_id": inventory_item_id,
+                    "available": product.get("stock", 0)
+                }
+                
+                inventory_response = requests.post(inventory_url, headers=headers, json=inventory_data)
+                inventory_response.raise_for_status()
+                
+                items_succeeded += 1
+                
+            except Exception as e:
+                logger.error(f"Failed to update stock for variant {variant_id}: {str(e)}")
+                items_failed += 1
+        
+        # Log success
+        log = ShopifySyncLog(
+            sync_type="stock_export",
+            status=ShopifySyncStatus.SUCCESS,
+            items_processed=items_processed,
+            items_succeeded=items_succeeded,
+            items_failed=items_failed,
+            details={"stock_updated": items_succeeded}
+        )
+        await db.shopify_sync_logs.insert_one(log.model_dump())
+        
+        await db.shopify_settings.update_one(
+            {"id": settings["id"]},
+            {"$set": {"last_stock_sync": datetime.now(timezone.utc).isoformat()}}
+        )
+        
+        return {
+            "status": "success",
+            "items_synced": items_succeeded,
+            "items_failed": items_failed
+        }
+        
+    except Exception as e:
+        logger.error(f"Stock sync error: {str(e)}")
+        
+        log = ShopifySyncLog(
+            sync_type="stock_export",
+            status=ShopifySyncStatus.FAILED,
+            items_processed=0,
+            items_succeeded=0,
+            items_failed=0,
+            error_message=str(e)
+        )
+        await db.shopify_sync_logs.insert_one(log.model_dump())
+        
+        raise HTTPException(status_code=500, detail=f"Stock sync failed: {str(e)}")
 
 @api_router.post("/shopify/sync/orders")
 async def sync_shopify_orders():
@@ -1417,6 +2609,25 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# ============= HEALTH CHECK =============
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring and Docker"""
+    try:
+        # Check database connection
+        await db.command("ping")
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "version": "1.0.0"
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "database": "disconnected",
+            "error": str(e)
+        }
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
