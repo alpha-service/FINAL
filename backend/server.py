@@ -102,6 +102,12 @@ class Category(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name_fr: str
     name_nl: str
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    parent_id: Optional[str] = None  # For hierarchy
+    shopify_collection_id: Optional[str] = None
+    active: bool = True
+    product_count: int = 0  # Will be calculated dynamically
 
 class Product(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -841,9 +847,26 @@ async def get_user_stats(user_id: str, date_from: Optional[str] = None, date_to:
     }
 
 # --- Categories ---
-@api_router.get("/categories", response_model=List[Category])
+@api_router.get("/categories")
 async def get_categories():
-    return await db.categories.find({}, {"_id": 0}).to_list(100)
+    # Get all categories
+    categories = await db.categories.find({}, {"_id": 0}).to_list(500)
+    
+    # Calculate product count for each category using aggregation
+    pipeline = [
+        {"$group": {"_id": "$category_id", "count": {"$sum": 1}}}
+    ]
+    product_counts = await db.products.aggregate(pipeline).to_list(500)
+    count_map = {item["_id"]: item["count"] for item in product_counts if item["_id"]}
+    
+    # Add product_count to each category
+    for cat in categories:
+        cat["product_count"] = count_map.get(cat.get("id"), 0)
+    
+    # Sort by name
+    categories.sort(key=lambda x: x.get("name_fr", "").lower())
+    
+    return categories
 
 # --- Products ---
 @api_router.get("/products", response_model=List[Product])
@@ -2122,14 +2145,26 @@ async def sync_shopify_products():
                         ]
                     })
                     
+                    # Get collection image
+                    coll_image = None
+                    if coll.get("image") and coll["image"].get("src"):
+                        coll_image = coll["image"]["src"]
+                    
                     if existing_cat:
                         collection_to_category[coll_id] = existing_cat["id"]
+                        # Update image if available
+                        if coll_image:
+                            await db.categories.update_one(
+                                {"id": existing_cat["id"]},
+                                {"$set": {"image_url": coll_image}}
+                            )
                     else:
                         new_cat = Category(
                             id=str(uuid.uuid4()),
                             name_fr=coll_name,
                             name_nl=coll_name,
                             description=f"Shopify Collection: {coll_name}",
+                            image_url=coll_image,
                             active=True
                         )
                         cat_data = new_cat.model_dump()
@@ -2176,14 +2211,26 @@ async def sync_shopify_products():
                         ]
                     })
                     
+                    # Get collection image
+                    coll_image = None
+                    if coll.get("image") and coll["image"].get("src"):
+                        coll_image = coll["image"]["src"]
+                    
                     if existing_cat:
                         collection_to_category[coll_id] = existing_cat["id"]
+                        # Update image if available
+                        if coll_image:
+                            await db.categories.update_one(
+                                {"id": existing_cat["id"]},
+                                {"$set": {"image_url": coll_image}}
+                            )
                     else:
                         new_cat = Category(
                             id=str(uuid.uuid4()),
                             name_fr=coll_name,
                             name_nl=coll_name,
                             description=f"Shopify Smart Collection: {coll_name}",
+                            image_url=coll_image,
                             active=True
                         )
                         cat_data = new_cat.model_dump()

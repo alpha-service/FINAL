@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "sonner";
-import { Search, ShoppingCart, Plus, Minus, Trash2, User, Receipt, X, Printer, Download, FileText, FileCheck, Settings, LayoutGrid, Package, Truck, CreditCard, Minimize2, Maximize2 } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, User, Receipt, X, Printer, Download, FileText, FileCheck, Settings, LayoutGrid, Package, Truck, CreditCard, Minimize2, Maximize2, ArrowLeft, FolderOpen, ChevronRight, Home, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -53,6 +53,7 @@ export default function POSScreen() {
   const [cart, setCart] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [posViewMode, setPosViewMode] = useState("collections"); // NEW: "collections" | "products"
   const [loading, setLoading] = useState(true);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [showPayment, setShowPayment] = useState(false);
@@ -103,11 +104,8 @@ export default function POSScreen() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [productsRes, categoriesRes] = await Promise.all([
-          axios.get(`${API}/products`),
-          axios.get(`${API}/categories`)
-        ]);
-        setProducts(productsRes.data);
+        // Always fetch categories
+        const categoriesRes = await axios.get(`${API}/categories`);
         setCategories(categoriesRes.data);
         
         // Load reorder cart if exists
@@ -140,6 +138,35 @@ export default function POSScreen() {
       }
     };
     fetchData();
+  }, []);
+
+  // Fetch products when a category is selected
+  useEffect(() => {
+    if (selectedCategory) {
+      const fetchProducts = async () => {
+        setLoading(true);
+        try {
+          const response = await axios.get(`${API}/products?category_id=${selectedCategory.id}`);
+          setProducts(response.data);
+          setPosViewMode("products");
+        } catch (error) {
+          toast.error("Erreur de chargement des produits");
+          console.error(error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchProducts();
+    } else {
+      setProducts([]);
+      setPosViewMode("collections");
+    }
+  }, [selectedCategory]);
+
+  // Go back to collections view
+  const goBackToCollections = useCallback(() => {
+    setSelectedCategory(null);
+    setSearchQuery("");
   }, []);
 
   // Hotkey handlers
@@ -182,7 +209,6 @@ export default function POSScreen() {
         product.barcode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         product.vendor?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         tagsArray.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
-      const matchesCategory = !selectedCategory || product.category_id === selectedCategory;
       
       // Size/variant filter - extract size from product name (e.g., "Product - XL" or "Product - 50x100")
       const matchesSize = !selectedSize || (() => {
@@ -191,9 +217,19 @@ export default function POSScreen() {
         return variantPart.includes(selectedSize.toLowerCase());
       })();
       
-      return matchesSearch && matchesCategory && matchesSize;
+      return matchesSearch && matchesSize;
     });
-  }, [products, searchQuery, selectedCategory, selectedSize]);
+  }, [products, searchQuery, selectedSize]);
+
+  // Filter categories for search
+  const filteredCategories = useMemo(() => {
+    if (!searchQuery) return categories;
+    const q = searchQuery.toLowerCase();
+    return categories.filter(cat =>
+      cat.name_fr?.toLowerCase().includes(q) ||
+      cat.name_nl?.toLowerCase().includes(q)
+    );
+  }, [categories, searchQuery]);
 
   // Extract available sizes/variants from products
   const availableSizes = useMemo(() => {
@@ -1221,11 +1257,38 @@ export default function POSScreen() {
           {/* Search and Categories */}
           <div className="p-4 bg-white border-b border-slate-200 space-y-3">
             {/* Search and Zoom Controls */}
+            {/* Breadcrumb and Back Button for products view */}
+            {posViewMode === "products" && selectedCategory && (
+              <div className="flex items-center gap-2 mb-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={goBackToCollections}
+                  className="h-8 px-2 hover:bg-brand-orange/10"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </Button>
+                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <button 
+                    onClick={goBackToCollections}
+                    className="hover:text-brand-orange flex items-center gap-1"
+                  >
+                    <Layers className="w-4 h-4" />
+                    Collections
+                  </button>
+                  <ChevronRight className="w-4 h-4" />
+                  <span className="text-brand-navy font-medium">{selectedCategory.name_fr}</span>
+                  <Badge variant="secondary" className="ml-2">{filteredProducts.length}</Badge>
+                </div>
+              </div>
+            )}
+
+            {/* Search */}
             <div className="flex items-center gap-3">
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
-                  placeholder="Rechercher SKU, nom... / Zoek SKU, naam..."
+                  placeholder={posViewMode === "collections" ? "Rechercher une collection..." : "Rechercher SKU, nom... / Zoek SKU, naam..."}
                   className="pl-10 h-12 text-base search-input bg-slate-50 border-slate-200"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -1233,73 +1296,50 @@ export default function POSScreen() {
                 />
               </div>
               
-              {/* Grid Size Selector */}
-              <div className="flex items-center bg-slate-100 rounded-lg p-1">
-                <Button
-                  variant={productGridSize === 'small' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="h-8 px-2"
-                  onClick={() => updateGridSize('small')}
-                  title="Petite taille"
-                >
-                  <div className="grid grid-cols-3 gap-0.5 w-3 h-3">
-                    {Array(9).fill(0).map((_, i) => (
-                      <div key={i} className="bg-current w-0.5 h-0.5 rounded-[1px]" />
-                    ))}
-                  </div>
-                </Button>
-                <Button
-                  variant={productGridSize === 'medium' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="h-8 px-2"
-                  onClick={() => updateGridSize('medium')}
-                  title="Taille moyenne"
-                >
-                  <div className="grid grid-cols-2 gap-0.5 w-3 h-3">
-                    {Array(4).fill(0).map((_, i) => (
-                      <div key={i} className="bg-current w-1 h-1 rounded-[1px]" />
-                    ))}
-                  </div>
-                </Button>
-                <Button
-                  variant={productGridSize === 'large' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="h-8 px-2"
-                  onClick={() => updateGridSize('large')}
-                  title="Grande taille"
-                >
-                  <div className="w-3 h-3 bg-current rounded-[1px]" />
-                </Button>
-              </div>
+              {/* Grid Size Selector - only show in products view */}
+              {posViewMode === "products" && (
+                <div className="flex items-center bg-slate-100 rounded-lg p-1">
+                  <Button
+                    variant={productGridSize === 'small' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-8 px-2"
+                    onClick={() => updateGridSize('small')}
+                    title="Petite taille"
+                  >
+                    <div className="grid grid-cols-3 gap-0.5 w-3 h-3">
+                      {Array(9).fill(0).map((_, i) => (
+                        <div key={i} className="bg-current w-0.5 h-0.5 rounded-[1px]" />
+                      ))}
+                    </div>
+                  </Button>
+                  <Button
+                    variant={productGridSize === 'medium' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-8 px-2"
+                    onClick={() => updateGridSize('medium')}
+                    title="Taille moyenne"
+                  >
+                    <div className="grid grid-cols-2 gap-0.5 w-3 h-3">
+                      {Array(4).fill(0).map((_, i) => (
+                        <div key={i} className="bg-current w-1 h-1 rounded-[1px]" />
+                      ))}
+                    </div>
+                  </Button>
+                  <Button
+                    variant={productGridSize === 'large' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-8 px-2"
+                    onClick={() => updateGridSize('large')}
+                    title="Grande taille"
+                  >
+                    <div className="w-3 h-3 bg-current rounded-[1px]" />
+                  </Button>
+                </div>
+              )}
             </div>
 
-            {/* Categories */}
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
-              <Button
-                variant={selectedCategory === null ? "default" : "outline"}
-                style={selectedCategory === null ? { backgroundColor: colors.primary } : {}}
-                className={`shrink-0 category-tab ${selectedCategory === null ? 'active text-white' : ''}`}
-                onClick={() => setSelectedCategory(null)}
-                data-testid="category-all"
-              >
-                Tout / Alles
-              </Button>
-              {categories.map((cat) => (
-                <Button
-                  key={cat.id}
-                  variant={selectedCategory === cat.id ? "default" : "outline"}
-                  style={selectedCategory === cat.id ? { backgroundColor: colors.primary } : {}}
-                  className={`shrink-0 category-tab ${selectedCategory === cat.id ? 'active text-white' : ''}`}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  data-testid={`category-${cat.id}`}
-                >
-                  {cat.name_fr} / {cat.name_nl}
-                </Button>
-              ))}
-            </div>
-
-            {/* Size/Variant Filter - only show if sizes exist */}
-            {availableSizes.length > 0 && (
+            {/* Size/Variant Filter - only show in products view if sizes exist */}
+            {posViewMode === "products" && availableSizes.length > 0 && (
               <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
                 <Button
                   variant={selectedSize === null ? "secondary" : "ghost"}
@@ -1324,12 +1364,77 @@ export default function POSScreen() {
             )}
           </div>
 
-          {/* Products Grid - OPTIMIZED for performance and visibility */}
-          <ScrollArea className="flex-1 p-2">
-            <div 
-              className={`product-grid grid gap-2 ${getGridClasses()}`}
-            >
-              {filteredProducts.map((product) => {
+          {/* Collections Grid - when in collections view */}
+          {posViewMode === "collections" && (
+            <ScrollArea className="flex-1 p-3">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3">
+                {loading ? (
+                  <div className="col-span-full text-center py-12 text-muted-foreground">
+                    Chargement...
+                  </div>
+                ) : filteredCategories.length === 0 ? (
+                  <div className="col-span-full text-center py-12 text-muted-foreground">
+                    {searchQuery ? "Aucune collection trouvée" : "Aucune catégorie disponible"}
+                  </div>
+                ) : (
+                  filteredCategories.map((category) => (
+                    <button
+                      key={category.id}
+                      onClick={() => setSelectedCategory(category)}
+                      className="group bg-white rounded-xl border border-slate-200 p-3 hover:border-brand-orange hover:shadow-lg transition-all duration-200 text-left active:scale-95"
+                    >
+                      <div className="flex flex-col items-center text-center">
+                        <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-2 transition-colors bg-gradient-to-br from-brand-orange/10 to-brand-navy/10 group-hover:from-brand-orange/20 group-hover:to-brand-navy/20 overflow-hidden">
+                          {category.image_url ? (
+                            <img 
+                              src={category.image_url} 
+                              alt={category.name_fr}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <FolderOpen className="w-7 h-7 text-brand-orange" />
+                          )}
+                        </div>
+                        <h3 className="font-medium text-xs text-brand-navy group-hover:text-brand-orange transition-colors line-clamp-2 mb-0.5">
+                          {category.name_fr}
+                        </h3>
+                        <Badge variant="secondary" className="text-[10px] px-1.5">
+                          {category.product_count || 0}
+                        </Badge>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          )}
+
+          {/* Products Grid - when in products view */}
+          {posViewMode === "products" && (
+            <ScrollArea className="flex-1 p-2">
+              <div 
+                className={`product-grid grid gap-2 ${getGridClasses()}`}
+              >
+                {loading ? (
+                  <div className="col-span-full text-center py-12 text-muted-foreground">
+                    Chargement des produits...
+                  </div>
+                ) : filteredProducts.length === 0 ? (
+                  <div className="col-span-full text-center py-12 text-muted-foreground">
+                    <Package className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                    <p>{searchQuery ? "Aucun produit trouvé" : "Aucun produit dans cette collection"}</p>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="mt-3"
+                      onClick={goBackToCollections}
+                    >
+                      <ArrowLeft className="w-4 h-4 mr-1" />
+                      Retour aux collections
+                    </Button>
+                  </div>
+                ) : (
+                  filteredProducts.map((product) => {
                 // Extract product attributes for display
                 const nameParts = product.name_fr?.split(' - ') || [product.name_fr];
                 const baseName = nameParts.slice(0, -1).join(' - ') || nameParts[0];
@@ -1509,15 +1614,9 @@ export default function POSScreen() {
                   </TooltipProvider>
                 );
               })}
-            </div>
-
-            {filteredProducts.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
-                <Search className="w-12 h-12 mb-3 opacity-30" />
-                <p>Aucun produit trouvé / Geen producten gevonden</p>
               </div>
-            )}
-          </ScrollArea>
+            </ScrollArea>
+          )}
         </div>
 
         {/* Resizable Handle - Only for horizontal and vertical layouts */}
