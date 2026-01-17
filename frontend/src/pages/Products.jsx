@@ -35,7 +35,7 @@ export default function Products() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [categories, setCategories] = useState([]);
-  const [navigationPath, setNavigationPath] = useState([]); // Breadcrumb path: [{id, name}]
+  const [selectedCategory, setSelectedCategory] = useState(null);
   const [currentView, setCurrentView] = useState("collections"); // "collections" | "products"
   const [displayMode, setDisplayMode] = useState("grid"); // "grid" | "list"
   const [showModal, setShowModal] = useState(false);
@@ -64,34 +64,16 @@ export default function Products() {
     fetchCategories();
   }, []);
 
-  // Get current category ID from navigation path
-  const currentCategoryId = navigationPath.length > 0 
-    ? navigationPath[navigationPath.length - 1].id 
-    : null;
-
-  // Get subcategories of current category
-  const currentSubcategories = useMemo(() => {
-    if (!currentCategoryId) {
-      // Root level - show categories without parent
-      return categories.filter(c => !c.parent_id);
-    }
-    // Show children of current category
-    return categories.filter(c => c.parent_id === currentCategoryId);
-  }, [categories, currentCategoryId]);
-
-  // Check if current category has products (no more subcategories)
-  const hasSubcategories = currentSubcategories.length > 0;
-
+  // When a category is selected, load its products
   useEffect(() => {
-    // When navigating, check if we should show products or subcategories
-    if (currentCategoryId && !hasSubcategories) {
+    if (selectedCategory) {
       setCurrentView("products");
-      fetchProducts(currentCategoryId);
+      fetchProducts(selectedCategory.id);
     } else {
       setCurrentView("collections");
       setProducts([]);
     }
-  }, [currentCategoryId, hasSubcategories]);
+  }, [selectedCategory]);
 
   const fetchProducts = async (categoryId) => {
     setLoading(true);
@@ -121,40 +103,27 @@ export default function Products() {
     }
   };
 
-  // Navigate into a category
-  const navigateToCategory = (category) => {
-    setNavigationPath([...navigationPath, { id: category.id, name: category.name_fr }]);
+  // Select a category to view its products
+  const selectCategory = (category) => {
+    setSelectedCategory(category);
     setSearchQuery("");
   };
 
-  // Navigate back to a specific level in breadcrumb
-  const navigateToBreadcrumb = (index) => {
-    if (index === -1) {
-      // Go to root
-      setNavigationPath([]);
-    } else {
-      setNavigationPath(navigationPath.slice(0, index + 1));
-    }
+  // Go back to categories list
+  const goBackToCategories = () => {
+    setSelectedCategory(null);
     setSearchQuery("");
   };
 
-  // Go back one level
-  const goBack = () => {
-    if (navigationPath.length > 0) {
-      setNavigationPath(navigationPath.slice(0, -1));
-      setSearchQuery("");
-    }
-  };
-
-  // Filter categories/products by search
+  // Filter categories by search
   const filteredCategories = useMemo(() => {
-    if (!searchQuery) return currentSubcategories;
+    if (!searchQuery) return categories;
     const q = searchQuery.toLowerCase();
-    return currentSubcategories.filter(cat =>
+    return categories.filter(cat =>
       cat.name_fr?.toLowerCase().includes(q) ||
       cat.name_nl?.toLowerCase().includes(q)
     );
-  }, [currentSubcategories, searchQuery]);
+  }, [categories, searchQuery]);
 
   const filteredProducts = useMemo(() => {
     if (!searchQuery) return products;
@@ -180,7 +149,7 @@ export default function Products() {
       sku: "",
       name_fr: "",
       name_nl: "",
-      category_id: currentCategoryId || "",
+      category_id: selectedCategory?.id || "",
       price_retail: "",
       price_wholesale: "",
       price_purchase: "",
@@ -245,7 +214,7 @@ export default function Products() {
       }
       
       setShowModal(false);
-      if (currentCategoryId) fetchProducts(currentCategoryId);
+      if (selectedCategory) fetchProducts(selectedCategory.id);
     } catch (error) {
       toast.error("Erreur lors de la sauvegarde");
       console.error(error);
@@ -258,7 +227,7 @@ export default function Products() {
     try {
       await axios.delete(`${API}/products/${productId}`);
       toast.success("Produit supprimé");
-      if (currentCategoryId) fetchProducts(currentCategoryId);
+      if (selectedCategory) fetchProducts(selectedCategory.id);
     } catch (error) {
       toast.error("Erreur lors de la suppression");
       console.error(error);
@@ -274,25 +243,16 @@ export default function Products() {
     return <Badge className="bg-green-100 text-green-800">En stock</Badge>;
   };
 
-  // Get count of children (subcategories or products) for a category
-  const getCategoryChildCount = (category) => {
-    const subcatCount = categories.filter(c => c.parent_id === category.id).length;
-    if (subcatCount > 0) {
-      return `${subcatCount} sous-catégories`;
-    }
-    return `${category.product_count || 0} produits`;
-  };
-
   return (
     <div className="p-6" data-testid="products">
-      {/* Header with Breadcrumb */}
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          {navigationPath.length > 0 && (
+          {selectedCategory && (
             <Button 
               variant="ghost" 
               size="icon"
-              onClick={goBack}
+              onClick={goBackToCategories}
               className="hover:bg-brand-orange/10"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -302,33 +262,28 @@ export default function Products() {
             {/* Breadcrumb */}
             <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
               <button 
-                onClick={() => navigateToBreadcrumb(-1)}
+                onClick={goBackToCategories}
                 className="hover:text-brand-orange flex items-center gap-1"
               >
                 <Home className="w-4 h-4" />
                 Collections
               </button>
-              {navigationPath.map((item, index) => (
-                <span key={item.id} className="flex items-center gap-1">
+              {selectedCategory && (
+                <span className="flex items-center gap-1">
                   <ChevronRight className="w-4 h-4" />
-                  <button 
-                    onClick={() => navigateToBreadcrumb(index)}
-                    className={`hover:text-brand-orange ${index === navigationPath.length - 1 ? 'text-brand-navy font-medium' : ''}`}
-                  >
-                    {item.name}
-                  </button>
+                  <span className="text-brand-navy font-medium">{selectedCategory.name_fr}</span>
                 </span>
-              ))}
+              )}
             </div>
             
             <h1 className="text-2xl font-heading font-bold text-brand-navy flex items-center gap-2">
-              {navigationPath.length === 0 ? (
+              {!selectedCategory ? (
                 <>
                   <Layers className="w-6 h-6" />
                   Collections / Collecties
                 </>
               ) : (
-                navigationPath[navigationPath.length - 1].name
+                selectedCategory.name_fr
               )}
               {currentView === "products" && (
                 <Badge variant="secondary" className="text-sm ml-2">
@@ -339,7 +294,7 @@ export default function Products() {
             <p className="text-muted-foreground mt-1">
               {currentView === "collections" 
                 ? `${filteredCategories.length} catégorie(s) disponible(s)` 
-                : "Produits de cette collection"
+                : selectedCategory?.name_nl || "Produits de cette collection"
               }
             </p>
           </div>
@@ -408,53 +363,44 @@ export default function Products() {
             </div>
           ) : filteredCategories.length === 0 ? (
             <div className="col-span-full text-center py-12 text-muted-foreground">
-              {searchQuery ? "Aucune collection trouvée" : "Aucune sous-catégorie - affichage des produits..."}
+              {searchQuery ? "Aucune collection trouvée" : "Aucune catégorie disponible"}
             </div>
           ) : (
-            filteredCategories.map((category) => {
-              const hasChildren = categories.some(c => c.parent_id === category.id);
-              return (
-                <button
-                  key={category.id}
-                  onClick={() => navigateToCategory(category)}
-                  className="group bg-white rounded-xl border border-slate-200 p-4 hover:border-brand-orange hover:shadow-lg transition-all duration-200 text-left"
-                >
-                  <div className="flex flex-col items-center text-center">
-                    <div className={`w-16 h-16 rounded-xl flex items-center justify-center mb-3 transition-colors ${
-                      hasChildren 
-                        ? 'bg-gradient-to-br from-blue-100 to-indigo-100 group-hover:from-blue-200 group-hover:to-indigo-200' 
-                        : 'bg-gradient-to-br from-brand-orange/10 to-brand-navy/10 group-hover:from-brand-orange/20 group-hover:to-brand-navy/20'
-                    }`}>
-                      {category.image_url ? (
-                        <img 
-                          src={category.image_url} 
-                          alt={category.name_fr}
-                          className="w-12 h-12 object-cover rounded-lg"
-                        />
-                      ) : hasChildren ? (
-                        <FolderOpen className="w-8 h-8 text-indigo-600" />
-                      ) : (
-                        <Package className="w-8 h-8 text-brand-orange" />
-                      )}
-                    </div>
-                    <h3 className="font-medium text-sm text-brand-navy group-hover:text-brand-orange transition-colors line-clamp-2 mb-1">
-                      {category.name_fr}
-                    </h3>
-                    <p className="text-xs text-muted-foreground line-clamp-1">
-                      {category.name_nl}
-                    </p>
-                    <Badge variant="secondary" className="mt-2 text-xs">
-                      {getCategoryChildCount(category)}
-                    </Badge>
+            filteredCategories.map((category) => (
+              <button
+                key={category.id}
+                onClick={() => selectCategory(category)}
+                className="group bg-white rounded-xl border border-slate-200 p-4 hover:border-brand-orange hover:shadow-lg transition-all duration-200 text-left"
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-16 h-16 rounded-xl flex items-center justify-center mb-3 transition-colors bg-gradient-to-br from-brand-orange/10 to-brand-navy/10 group-hover:from-brand-orange/20 group-hover:to-brand-navy/20">
+                    {category.image_url ? (
+                      <img 
+                        src={category.image_url} 
+                        alt={category.name_fr}
+                        className="w-12 h-12 object-cover rounded-lg"
+                      />
+                    ) : (
+                      <FolderOpen className="w-8 h-8 text-brand-orange" />
+                    )}
                   </div>
-                  <div className="flex items-center justify-center mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span className="text-xs text-brand-orange flex items-center gap-1">
-                      {hasChildren ? "Voir sous-catégories" : "Voir produits"} <ChevronRight className="w-3 h-3" />
-                    </span>
-                  </div>
-                </button>
-              );
-            })
+                  <h3 className="font-medium text-sm text-brand-navy group-hover:text-brand-orange transition-colors line-clamp-2 mb-1">
+                    {category.name_fr}
+                  </h3>
+                  <p className="text-xs text-muted-foreground line-clamp-1">
+                    {category.name_nl}
+                  </p>
+                  <Badge variant="secondary" className="mt-2 text-xs">
+                    {category.product_count || 0} produits
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-center mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span className="text-xs text-brand-orange flex items-center gap-1">
+                    Voir produits <ChevronRight className="w-3 h-3" />
+                  </span>
+                </div>
+              </button>
+            ))
           )}
         </div>
       )}
