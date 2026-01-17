@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "sonner";
-import { Search, ShoppingCart, Plus, Minus, Trash2, User, Receipt, X, Printer, Download, FileText, FileCheck, Settings, LayoutGrid, Package, Truck, CreditCard, Minimize2, Maximize2, ArrowLeft, FolderOpen, ChevronRight, Home, Layers } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, User, Receipt, X, Printer, Download, FileText, FileCheck, Settings, LayoutGrid, Package, Truck, CreditCard, Minimize2, Maximize2, ArrowLeft, FolderOpen, ChevronRight, Home, Layers, Percent, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -55,6 +55,7 @@ export default function POSScreen() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [posViewMode, setPosViewMode] = useState("collections"); // NEW: "collections" | "products"
   const [loading, setLoading] = useState(true);
+  const [loadingProducts, setLoadingProducts] = useState(false); // NEW: For smooth category switching
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [showPayment, setShowPayment] = useState(false);
   const [showCustomerSelect, setShowCustomerSelect] = useState(false);
@@ -69,6 +70,10 @@ export default function POSScreen() {
   const [editingPriceId, setEditingPriceId] = useState(null);
   const [tempPrice, setTempPrice] = useState("");
   const [selectedSize, setSelectedSize] = useState(null); // NEW: Size filter
+  
+  // NEW: Individual item discount editing
+  const [editingDiscountId, setEditingDiscountId] = useState(null);
+  const [tempDiscount, setTempDiscount] = useState({ type: "percent", value: "" });
   
   // Layout-related state
   const [highlightedItemId, setHighlightedItemId] = useState(null);
@@ -144,7 +149,7 @@ export default function POSScreen() {
   useEffect(() => {
     if (selectedCategory) {
       const fetchProducts = async () => {
-        setLoading(true);
+        setLoadingProducts(true); // Use light loading instead of full loading
         try {
           const response = await axios.get(`${API}/products?category_id=${selectedCategory.id}`);
           setProducts(response.data);
@@ -153,7 +158,7 @@ export default function POSScreen() {
           toast.error("Erreur de chargement des produits");
           console.error(error);
         } finally {
-          setLoading(false);
+          setLoadingProducts(false);
         }
       };
       fetchProducts();
@@ -532,6 +537,57 @@ export default function POSScreen() {
     ));
   };
 
+  // Start editing item discount
+  const startEditingDiscount = (productId, currentType, currentValue) => {
+    setEditingDiscountId(productId);
+    setTempDiscount({ type: currentType || "percent", value: currentValue?.toString() || "" });
+  };
+
+  // Confirm item discount
+  const confirmDiscountEdit = (productId) => {
+    applyLineDiscount(productId, tempDiscount.type, tempDiscount.value);
+    setEditingDiscountId(null);
+    setTempDiscount({ type: "percent", value: "" });
+    toast.success("Remise appliquée");
+  };
+
+  // Cancel discount edit
+  const cancelDiscountEdit = () => {
+    setEditingDiscountId(null);
+    setTempDiscount({ type: "percent", value: "" });
+  };
+
+  // Remove item discount
+  const removeItemDiscount = (productId) => {
+    applyLineDiscount(productId, null, 0);
+    toast.success("Remise supprimée");
+  };
+
+  // Calculate line item details with VAT
+  const calculateLineItem = useCallback((item) => {
+    let lineSubtotal = item.qty * item.unit_price;
+    let discountAmount = 0;
+    
+    if (item.discount_type === "percent") {
+      discountAmount = lineSubtotal * (item.discount_value / 100);
+    } else if (item.discount_type === "fixed") {
+      discountAmount = item.discount_value;
+    }
+    
+    const afterDiscount = lineSubtotal - discountAmount;
+    const lineVat = afterDiscount * (item.vat_rate / 100);
+    const lineTotal = afterDiscount + lineVat;
+    
+    return {
+      subtotal: lineSubtotal,
+      discount: discountAmount,
+      afterDiscount,
+      vat: lineVat,
+      vatRate: item.vat_rate,
+      total: lineTotal
+    };
+  }, []);
+
   // Calculate totals with useMemo for performance
   const totals = useMemo(() => {
     let subtotal = 0;
@@ -898,18 +954,28 @@ export default function POSScreen() {
             <p className="text-sm">Panier vide / Lege winkelwagen</p>
           </div>
         ) : compactCart ? (
-          /* COMPACT MODE - Table-like for maximum items */
+          /* COMPACT MODE - Table-like for maximum items with discount and TVA */
           <div className="divide-y divide-slate-100">
-            {cart.map((item) => (
+            {cart.map((item) => {
+              const lineCalc = calculateLineItem(item);
+              return (
               <div
                 key={item.product_id}
-                className={`flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 ${
+                className={`flex items-center gap-1.5 px-2 py-1.5 hover:bg-slate-50 ${
                   highlightedItemId === item.product_id ? 'bg-orange-50' : ''
-                } ${item.priceOverridden ? 'bg-amber-50' : ''}`}
+                } ${item.priceOverridden ? 'bg-amber-50' : ''} ${item.discount_value > 0 ? 'bg-green-50' : ''}`}
               >
                 {/* Product info - compact */}
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium truncate">{item.name}</p>
+                  <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                    <span>TVA {item.vat_rate}%</span>
+                    {item.discount_value > 0 && (
+                      <span className="text-green-600">
+                        | -{item.discount_type === "percent" ? `${item.discount_value}%` : `€${item.discount_value}`}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 
                 {/* Quantity controls - ultra compact */}
@@ -933,6 +999,17 @@ export default function POSScreen() {
                   </Button>
                 </div>
                 
+                {/* Discount button - compact */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`h-5 w-5 p-0 ${item.discount_value > 0 ? 'text-green-600' : 'text-muted-foreground'}`}
+                  onClick={() => startEditingDiscount(item.product_id, item.discount_type, item.discount_value)}
+                  title="Remise"
+                >
+                  <Tag className="w-3 h-3" />
+                </Button>
+                
                 {/* Price - click to edit */}
                 {editingPriceId === item.product_id ? (
                   <div className="flex items-center gap-0.5">
@@ -953,12 +1030,12 @@ export default function POSScreen() {
                 ) : (
                   <span 
                     className={`text-xs font-bold cursor-pointer hover:text-brand-orange ${
-                      item.priceOverridden ? 'text-amber-600' : 'text-brand-navy'
+                      item.priceOverridden ? 'text-amber-600' : item.discount_value > 0 ? 'text-green-600' : 'text-brand-navy'
                     }`}
                     onClick={() => startEditingPrice(item.product_id, item.unit_price)}
-                    title="Cliquez pour modifier le prix"
+                    title="Modifier le prix"
                   >
-                    €{(item.qty * item.unit_price).toFixed(2)}
+                    €{lineCalc.afterDiscount.toFixed(2)}
                   </span>
                 )}
                 
@@ -972,21 +1049,24 @@ export default function POSScreen() {
                   <X className="w-3 h-3" />
                 </Button>
               </div>
-            ))}
+            );})}
           </div>
         ) : (
-          /* NORMAL MODE - Cards with full details */
+          /* NORMAL MODE - Cards with full details, TVA and discounts */
           <div className="p-2 space-y-1.5">
-            {cart.map((item) => (
+            {cart.map((item) => {
+              const lineCalc = calculateLineItem(item);
+              return (
               <div
                 key={item.product_id}
                 className={`cart-item bg-white rounded-lg border p-2 transition-all ${
                   highlightedItemId === item.product_id 
                     ? 'border-brand-orange bg-orange-50 scale-[1.02]' 
                     : 'border-slate-200'
-                } ${item.priceOverridden ? 'ring-1 ring-amber-400' : ''}`}
+                } ${item.priceOverridden ? 'ring-1 ring-amber-400' : ''} ${item.discount_value > 0 ? 'ring-1 ring-green-400' : ''}`}
                 data-testid={`cart-item-${item.product_id}`}
               >
+                {/* Header: Name + Delete */}
                 <div className="flex justify-between items-start mb-1">
                   <div className="flex-1 min-w-0 pr-2">
                     <p className="font-medium text-xs truncate">{item.name}</p>
@@ -1003,14 +1083,14 @@ export default function POSScreen() {
                   </Button>
                 </div>
                 
-                <div className="flex items-center justify-between gap-2">
+                {/* Quantity + Price Row */}
+                <div className="flex items-center justify-between gap-2 mb-1">
                   <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
                     <Button
                       variant="ghost"
                       size="sm"
                       className="qty-btn h-6 w-6 p-0"
                       onClick={() => updateQuantity(item.product_id, -1)}
-                      data-testid={`qty-minus-${item.product_id}`}
                     >
                       <Minus className="w-3 h-3" />
                     </Button>
@@ -1020,52 +1100,143 @@ export default function POSScreen() {
                       size="sm"
                       className="qty-btn h-6 w-6 p-0"
                       onClick={() => updateQuantity(item.product_id, 1)}
-                      data-testid={`qty-plus-${item.product_id}`}
                     >
                       <Plus className="w-3 h-3" />
                     </Button>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="font-bold text-brand-navy price-tag text-sm">
-                      €{(item.qty * item.unit_price * (1 - (item.discount_type === "percent" ? item.discount_value / 100 : 0)) - (item.discount_type === "fixed" ? item.discount_value : 0)).toFixed(2)}
-                    </p>
-                    {/* Click to edit price */}
-                    {editingPriceId === item.product_id ? (
-                      <div className="flex items-center justify-end gap-1">
-                        <span className="text-[10px] text-muted-foreground">€</span>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          className="h-5 w-14 text-[10px] text-right p-1 border-brand-orange"
-                          value={tempPrice}
-                          onChange={(e) => setTempPrice(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') confirmPriceEdit(item.product_id);
-                            if (e.key === 'Escape') cancelPriceEdit();
-                          }}
-                          onBlur={() => confirmPriceEdit(item.product_id)}
-                          autoFocus
-                        />
-                        <span className="text-[10px] text-muted-foreground">/ {item.unit}</span>
-                      </div>
-                    ) : (
-                      <div 
-                        className={`flex items-center justify-end gap-1 cursor-pointer hover:bg-slate-100 rounded px-1 py-0.5 ${
-                          item.priceOverridden ? 'bg-amber-50' : ''
-                        }`}
-                        onClick={() => startEditingPrice(item.product_id, item.unit_price)}
-                        title="Cliquez pour modifier le prix"
+                  
+                  {/* Unit price - click to edit */}
+                  {editingPriceId === item.product_id ? (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-muted-foreground">€</span>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="h-5 w-14 text-[10px] text-right p-1 border-brand-orange"
+                        value={tempPrice}
+                        onChange={(e) => setTempPrice(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') confirmPriceEdit(item.product_id);
+                          if (e.key === 'Escape') cancelPriceEdit();
+                        }}
+                        onBlur={() => confirmPriceEdit(item.product_id)}
+                        autoFocus
+                      />
+                    </div>
+                  ) : (
+                    <div 
+                      className={`flex items-center gap-1 cursor-pointer hover:bg-slate-100 rounded px-1 py-0.5 ${
+                        item.priceOverridden ? 'bg-amber-50' : ''
+                      }`}
+                      onClick={() => startEditingPrice(item.product_id, item.unit_price)}
+                      title="Modifier le prix unitaire"
+                    >
+                      <span className={`text-[10px] ${item.priceOverridden ? 'text-amber-600 font-medium' : 'text-muted-foreground'}`}>
+                        €{item.unit_price.toFixed(2)} / {item.unit}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Discount Row */}
+                <div className="flex items-center justify-between gap-2 mb-1 py-1 border-t border-slate-100">
+                  {editingDiscountId === item.product_id ? (
+                    <div className="flex items-center gap-1 flex-1">
+                      <select
+                        className="h-5 text-[10px] border rounded px-1"
+                        value={tempDiscount.type}
+                        onChange={(e) => setTempDiscount(prev => ({ ...prev, type: e.target.value }))}
                       >
-                        <span className={`text-[10px] ${item.priceOverridden ? 'text-amber-600 font-medium' : 'text-muted-foreground'}`}>
-                          €{item.unit_price.toFixed(2)} / {item.unit}
-                        </span>
-                      </div>
+                        <option value="percent">%</option>
+                        <option value="fixed">€</option>
+                      </select>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="h-5 w-14 text-[10px] p-1"
+                        value={tempDiscount.value}
+                        onChange={(e) => setTempDiscount(prev => ({ ...prev, value: e.target.value }))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') confirmDiscountEdit(item.product_id);
+                          if (e.key === 'Escape') cancelDiscountEdit();
+                        }}
+                        placeholder="0"
+                        autoFocus
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 w-5 p-0 text-green-600"
+                        onClick={() => confirmDiscountEdit(item.product_id)}
+                      >
+                        ✓
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 w-5 p-0 text-red-500"
+                        onClick={cancelDiscountEdit}
+                      >
+                        ✕
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`h-5 px-1 text-[10px] ${item.discount_value > 0 ? 'text-green-600 bg-green-50' : 'text-muted-foreground'}`}
+                        onClick={() => startEditingDiscount(item.product_id, item.discount_type, item.discount_value)}
+                        title="Ajouter une remise"
+                      >
+                        <Tag className="w-3 h-3 mr-0.5" />
+                        {item.discount_value > 0 
+                          ? (item.discount_type === "percent" ? `-${item.discount_value}%` : `-€${item.discount_value}`)
+                          : "Remise"
+                        }
+                      </Button>
+                      {item.discount_value > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-5 w-5 p-0 text-red-400 hover:text-red-600"
+                          onClick={() => removeItemDiscount(item.product_id)}
+                          title="Supprimer la remise"
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* TVA info */}
+                  <span className="text-[10px] text-muted-foreground">
+                    TVA {item.vat_rate}%: €{lineCalc.vat.toFixed(2)}
+                  </span>
+                </div>
+                
+                {/* Line Total Row */}
+                <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                  <div className="text-[10px] text-muted-foreground">
+                    {item.discount_value > 0 && (
+                      <span className="text-green-600">
+                        Remise: -€{lineCalc.discount.toFixed(2)}
+                      </span>
                     )}
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-brand-navy text-sm">
+                      €{lineCalc.afterDiscount.toFixed(2)}
+                    </p>
+                    <p className="text-[9px] text-muted-foreground">
+                      TTC: €{lineCalc.total.toFixed(2)}
+                    </p>
                   </div>
                 </div>
               </div>
-            ))}
+            );})}
           </div>
         )}
       </ScrollArea>
@@ -1411,30 +1582,30 @@ export default function POSScreen() {
 
           {/* Products Grid - when in products view */}
           {posViewMode === "products" && (
-            <ScrollArea className="flex-1 p-2">
-              <div 
-                className={`product-grid grid gap-2 ${getGridClasses()}`}
-              >
-                {loading ? (
-                  <div className="col-span-full text-center py-12 text-muted-foreground">
-                    Chargement des produits...
-                  </div>
-                ) : filteredProducts.length === 0 ? (
-                  <div className="col-span-full text-center py-12 text-muted-foreground">
-                    <Package className="w-12 h-12 mx-auto mb-2 opacity-30" />
-                    <p>{searchQuery ? "Aucun produit trouvé" : "Aucun produit dans cette collection"}</p>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="mt-3"
-                      onClick={goBackToCollections}
-                    >
-                      <ArrowLeft className="w-4 h-4 mr-1" />
-                      Retour aux collections
-                    </Button>
-                  </div>
-                ) : (
-                  filteredProducts.map((product) => {
+            <ScrollArea className="flex-1 p-2 relative">
+              {/* Subtle loading overlay when switching categories */}
+              {loadingProducts && (
+                <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center">
+                  <div className="animate-spin h-8 w-8 border-4 border-brand-orange border-t-transparent rounded-full"></div>
+                </div>
+              )}
+              {filteredProducts.length === 0 && !loadingProducts ? (
+                <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
+                  <Package className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                  <p>{searchQuery ? "Aucun produit trouvé" : "Aucun produit dans cette collection"}</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-3"
+                    onClick={goBackToCollections}
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-1" />
+                    Retour aux collections
+                  </Button>
+                </div>
+              ) : (
+                <div className={`product-grid grid gap-2 ${getGridClasses()}`}>
+                  {filteredProducts.map((product) => {
                 // Extract product attributes for display
                 const nameParts = product.name_fr?.split(' - ') || [product.name_fr];
                 const baseName = nameParts.slice(0, -1).join(' - ') || nameParts[0];
@@ -1614,7 +1785,8 @@ export default function POSScreen() {
                   </TooltipProvider>
                 );
               })}
-              </div>
+                </div>
+              )}
             </ScrollArea>
           )}
         </div>

@@ -18,7 +18,11 @@ import {
   List,
   ChevronRight,
   Home,
-  Layers
+  Layers,
+  LayoutGrid,
+  LayoutList,
+  FolderTree,
+  PackageSearch
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,11 +37,14 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 export default function Products() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingProducts, setLoadingProducts] = useState(false); // For smooth category switching
   const [searchQuery, setSearchQuery] = useState("");
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
-  const [currentView, setCurrentView] = useState("collections"); // "collections" | "products"
+  const [currentView, setCurrentView] = useState("collections"); // "collections" | "products" | "all"
   const [displayMode, setDisplayMode] = useState("grid"); // "grid" | "list"
+  const [categoriesDisplayMode, setCategoriesDisplayMode] = useState("grid"); // "grid" | "list"
+  const [viewMode, setViewMode] = useState("categories"); // "categories" | "all" - toggle between category navigation or all products
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [formData, setFormData] = useState({
@@ -64,19 +71,47 @@ export default function Products() {
     fetchCategories();
   }, []);
 
+  // Handle viewMode changes
+  useEffect(() => {
+    if (viewMode === "all") {
+      setSelectedCategory(null);
+      setCurrentView("all");
+      fetchAllProducts();
+    } else {
+      if (!selectedCategory) {
+        setCurrentView("collections");
+        setProducts([]);
+      }
+    }
+  }, [viewMode]);
+
   // When a category is selected, load its products
   useEffect(() => {
     if (selectedCategory) {
       setCurrentView("products");
       fetchProducts(selectedCategory.id);
-    } else {
+    } else if (viewMode === "categories") {
       setCurrentView("collections");
       setProducts([]);
     }
-  }, [selectedCategory]);
+  }, [selectedCategory, viewMode]);
+
+  // Fetch all products without category filter
+  const fetchAllProducts = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(`${API}/products`);
+      setProducts(response.data);
+    } catch (error) {
+      toast.error("Erreur de chargement");
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchProducts = async (categoryId) => {
-    setLoading(true);
+    setLoadingProducts(true); // Use lighter loading for smooth transitions
     try {
       const params = new URLSearchParams();
       if (categoryId) params.append("category_id", categoryId);
@@ -87,7 +122,7 @@ export default function Products() {
       toast.error("Erreur de chargement");
       console.error(error);
     } finally {
-      setLoading(false);
+      setLoadingProducts(false);
     }
   };
 
@@ -111,6 +146,14 @@ export default function Products() {
 
   // Go back to categories list
   const goBackToCategories = () => {
+    setSelectedCategory(null);
+    setSearchQuery("");
+    setViewMode("categories");
+  };
+
+  // Switch to all products view
+  const showAllProducts = () => {
+    setViewMode("all");
     setSelectedCategory(null);
     setSearchQuery("");
   };
@@ -248,7 +291,7 @@ export default function Products() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          {selectedCategory && (
+          {(selectedCategory || currentView === "all") && (
             <Button 
               variant="ghost" 
               size="icon"
@@ -266,7 +309,7 @@ export default function Products() {
                 className="hover:text-brand-orange flex items-center gap-1"
               >
                 <Home className="w-4 h-4" />
-                Collections
+                {viewMode === "all" ? "Tous les produits" : "Collections"}
               </button>
               {selectedCategory && (
                 <span className="flex items-center gap-1">
@@ -277,7 +320,12 @@ export default function Products() {
             </div>
             
             <h1 className="text-2xl font-heading font-bold text-brand-navy flex items-center gap-2">
-              {!selectedCategory ? (
+              {currentView === "all" ? (
+                <>
+                  <PackageSearch className="w-6 h-6" />
+                  Tous les produits / Alle producten
+                </>
+              ) : !selectedCategory ? (
                 <>
                   <Layers className="w-6 h-6" />
                   Collections / Collecties
@@ -285,7 +333,7 @@ export default function Products() {
               ) : (
                 selectedCategory.name_fr
               )}
-              {currentView === "products" && (
+              {(currentView === "products" || currentView === "all") && (
                 <Badge variant="secondary" className="text-sm ml-2">
                   {filteredProducts.length} produit(s)
                 </Badge>
@@ -294,13 +342,64 @@ export default function Products() {
             <p className="text-muted-foreground mt-1">
               {currentView === "collections" 
                 ? `${filteredCategories.length} catégorie(s) disponible(s)` 
-                : selectedCategory?.name_nl || "Produits de cette collection"
+                : currentView === "all"
+                  ? "Affichage de tous les produits"
+                  : selectedCategory?.name_nl || "Produits de cette collection"
               }
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {currentView === "products" && (
+        <div className="flex items-center gap-3">
+          {/* View Mode Toggle - Categories vs All Products */}
+          {currentView === "collections" && (
+            <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
+              <Button
+                variant={viewMode === "categories" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("categories")}
+                className={viewMode === "categories" ? "bg-brand-navy text-white" : ""}
+              >
+                <FolderTree className="w-4 h-4 mr-1" />
+                Collections
+              </Button>
+              <Button
+                variant={viewMode === "all" ? "default" : "ghost"}
+                size="sm"
+                onClick={showAllProducts}
+                className={viewMode === "all" ? "bg-brand-navy text-white" : ""}
+              >
+                <PackageSearch className="w-4 h-4 mr-1" />
+                Tous
+              </Button>
+            </div>
+          )}
+          
+          {/* Categories Display Mode - Grid/List toggle for collections view */}
+          {currentView === "collections" && (
+            <div className="flex border rounded-md">
+              <Button 
+                variant={categoriesDisplayMode === "grid" ? "secondary" : "ghost"} 
+                size="sm"
+                onClick={() => setCategoriesDisplayMode("grid")}
+                className="rounded-r-none"
+                title="Vue grille"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </Button>
+              <Button 
+                variant={categoriesDisplayMode === "list" ? "secondary" : "ghost"} 
+                size="sm"
+                onClick={() => setCategoriesDisplayMode("list")}
+                className="rounded-l-none"
+                title="Vue liste"
+              >
+                <LayoutList className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
+
+          {/* Products Display Mode - for products and all views */}
+          {(currentView === "products" || currentView === "all") && (
             <>
               <div className="flex border rounded-md">
                 <Button 
@@ -336,7 +435,7 @@ export default function Products() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder={currentView === "collections" ? "Rechercher une collection..." : "SKU, nom, code-barres..."}
+                placeholder={currentView === "collections" ? "Rechercher une collection..." : "SKU, nom, code-barres, marque..."}
                 className="pl-10"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -345,7 +444,7 @@ export default function Products() {
             </div>
           </div>
           
-          {currentView === "products" && (
+          {(currentView === "products" || currentView === "all") && (
             <Button variant="outline">
               <Download className="w-4 h-4 mr-2" />
               Exporter
@@ -354,8 +453,8 @@ export default function Products() {
         </div>
       </div>
 
-      {/* Collections/Categories Grid */}
-      {currentView === "collections" && (
+      {/* Collections/Categories Grid View */}
+      {currentView === "collections" && categoriesDisplayMode === "grid" && (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           {loading ? (
             <div className="col-span-full text-center py-12 text-muted-foreground">
@@ -405,8 +504,84 @@ export default function Products() {
         </div>
       )}
 
-      {/* Products Grid View */}
-      {currentView === "products" && displayMode === "grid" && (
+      {/* Collections/Categories List View */}
+      {currentView === "collections" && categoriesDisplayMode === "list" && (
+        <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="text-left p-4 font-medium text-sm">Image</th>
+                  <th className="text-left p-4 font-medium text-sm">Collection (FR)</th>
+                  <th className="text-left p-4 font-medium text-sm">Collection (NL)</th>
+                  <th className="text-center p-4 font-medium text-sm">Produits</th>
+                  <th className="text-right p-4 font-medium text-sm">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                      Chargement...
+                    </td>
+                  </tr>
+                ) : filteredCategories.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                      {searchQuery ? "Aucune collection trouvée" : "Aucune catégorie disponible"}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredCategories.map((category) => (
+                    <tr 
+                      key={category.id} 
+                      className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors"
+                      onClick={() => selectCategory(category)}
+                    >
+                      <td className="p-4">
+                        <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-gradient-to-br from-brand-orange/10 to-brand-navy/10">
+                          {category.image_url ? (
+                            <img 
+                              src={category.image_url} 
+                              alt={category.name_fr}
+                              className="w-10 h-10 object-cover rounded-lg"
+                            />
+                          ) : (
+                            <FolderOpen className="w-6 h-6 text-brand-orange" />
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <span className="font-medium text-brand-navy">{category.name_fr}</span>
+                      </td>
+                      <td className="p-4 text-muted-foreground">
+                        {category.name_nl}
+                      </td>
+                      <td className="p-4 text-center">
+                        <Badge variant="secondary">
+                          {category.product_count || 0}
+                        </Badge>
+                      </td>
+                      <td className="p-4 text-right">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="text-brand-orange hover:text-brand-orange hover:bg-brand-orange/10"
+                        >
+                          Voir <ChevronRight className="w-4 h-4 ml-1" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* All Products Grid View */}
+      {currentView === "all" && displayMode === "grid" && (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           {loading ? (
             <div className="col-span-full text-center py-12 text-muted-foreground">
@@ -414,7 +589,7 @@ export default function Products() {
             </div>
           ) : filteredProducts.length === 0 ? (
             <div className="col-span-full text-center py-12 text-muted-foreground">
-              Aucun produit dans cette collection
+              {searchQuery ? "Aucun produit trouvé" : "Aucun produit disponible"}
             </div>
           ) : (
             filteredProducts.map((product) => (
@@ -470,6 +645,176 @@ export default function Products() {
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {/* All Products List View */}
+      {currentView === "all" && displayMode === "list" && (
+        <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="text-left p-4 font-medium text-sm">Image</th>
+                  <th className="text-left p-4 font-medium text-sm">SKU</th>
+                  <th className="text-left p-4 font-medium text-sm">Produit</th>
+                  <th className="text-left p-4 font-medium text-sm">Attributs</th>
+                  <th className="text-right p-4 font-medium text-sm">Prix</th>
+                  <th className="text-center p-4 font-medium text-sm">Stock</th>
+                  <th className="text-center p-4 font-medium text-sm">Statut</th>
+                  <th className="text-right p-4 font-medium text-sm">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                      Chargement...
+                    </td>
+                  </tr>
+                ) : filteredProducts.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                      {searchQuery ? "Aucun produit trouvé" : "Aucun produit disponible"}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredProducts.map((product) => (
+                    <tr key={product.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="p-4">
+                        <div className="w-12 h-12 rounded-lg bg-slate-100 overflow-hidden">
+                          {product.image_url ? (
+                            <img 
+                              src={product.image_url} 
+                              alt={product.name_fr}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Package className="w-6 h-6 text-slate-300" />
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <span className="font-mono text-xs text-muted-foreground">{product.sku}</span>
+                      </td>
+                      <td className="p-4">
+                        <div>
+                          <p className="font-medium text-sm">{product.name_fr}</p>
+                          <p className="text-xs text-muted-foreground">{product.name_nl}</p>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-wrap gap-1">
+                          {product.variant_title && (
+                            <Badge variant="outline" className="text-xs">{product.variant_title}</Badge>
+                          )}
+                          {product.vendor && (
+                            <Badge variant="secondary" className="text-xs">{product.vendor}</Badge>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4 text-right">
+                        <span className="font-bold text-brand-navy">€{product.price_retail?.toFixed(2)}</span>
+                      </td>
+                      <td className="p-4 text-center">
+                        <span className={product.stock_qty <= product.min_stock ? "text-red-600 font-medium" : ""}>
+                          {product.stock_qty}
+                        </span>
+                      </td>
+                      <td className="p-4 text-center">
+                        {getStockBadge(product)}
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => openEditModal(product)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600" onClick={() => handleDelete(product.id)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Products Grid View */}
+      {currentView === "products" && displayMode === "grid" && (
+        <div className="relative">
+          {/* Subtle loading overlay when switching categories */}
+          {loadingProducts && (
+            <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center rounded-xl">
+              <div className="animate-spin h-8 w-8 border-4 border-brand-orange border-t-transparent rounded-full"></div>
+            </div>
+          )}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {filteredProducts.length === 0 && !loadingProducts ? (
+              <div className="col-span-full text-center py-12 text-muted-foreground">
+                Aucun produit dans cette collection
+              </div>
+            ) : (
+              filteredProducts.map((product) => (
+              <div
+                key={product.id}
+                className="group bg-white rounded-xl border border-slate-200 overflow-hidden hover:border-brand-orange hover:shadow-lg transition-all duration-200"
+              >
+                <div className="aspect-square bg-slate-50 relative">
+                  {product.image_url ? (
+                    <img 
+                      src={product.image_url} 
+                      alt={product.name_fr}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Package className="w-12 h-12 text-slate-300" />
+                    </div>
+                  )}
+                  <div className="absolute top-2 right-2">
+                    {getStockBadge(product)}
+                  </div>
+                  {/* Quick actions overlay */}
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <Button size="sm" variant="secondary" onClick={() => openEditModal(product)}>
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => handleDelete(product.id)}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="p-3">
+                  <p className="text-xs font-mono text-muted-foreground mb-1">{product.sku}</p>
+                  <h3 className="font-medium text-sm line-clamp-2 mb-1" title={product.name_fr}>
+                    {product.name_fr}
+                  </h3>
+                  {product.variant_title && (
+                    <Badge variant="outline" className="text-xs mb-2">
+                      {product.variant_title}
+                    </Badge>
+                  )}
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="font-bold text-brand-navy">
+                      €{product.price_retail?.toFixed(2)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      Stock: {product.stock_qty}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+          </div>
         </div>
       )}
 
