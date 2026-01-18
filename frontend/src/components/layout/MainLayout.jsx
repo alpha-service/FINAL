@@ -23,7 +23,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/useTheme";
+import { useDesign, DESIGNS } from "@/hooks/useDesign";
 import ThemeSelector from "@/components/ThemeSelector";
+import DesignSelector from "@/components/DesignSelector";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -43,6 +45,7 @@ const NAV_ITEMS = [
 export default function MainLayout() {
   const location = useLocation();
   const { colors } = useTheme();
+  const { currentDesign, design } = useDesign();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarPinned, setSidebarPinned] = useState(() => {
     const saved = localStorage.getItem('sidebar_pinned');
@@ -53,6 +56,46 @@ export default function MainLayout() {
   const [stockAlerts, setStockAlerts] = useState(0);
 
   const showSidebar = sidebarOpen || sidebarPinned || isHovering;
+  
+  // Design-specific classes
+  const getSidebarClasses = () => {
+    switch (currentDesign) {
+      case DESIGNS.MODERN:
+        return "bg-gradient-to-b from-slate-900 via-purple-900 to-slate-900 backdrop-blur-xl border-r border-white/10";
+      case DESIGNS.MINIMAL:
+        return "bg-neutral-900 border-r-2 border-black";
+      default:
+        return "";
+    }
+  };
+  
+  const getNavItemClasses = (isActive) => {
+    switch (currentDesign) {
+      case DESIGNS.MODERN:
+        return cn(
+          "flex items-center gap-3 px-4 py-3 mb-1 transition-all duration-300",
+          design.navItemStyle,
+          isActive
+            ? "bg-gradient-to-r from-purple-500/30 to-pink-500/30 text-white shadow-lg shadow-purple-500/20 border border-white/10"
+            : "text-slate-300 hover:bg-white/10 hover:text-white hover:translate-x-1"
+        );
+      case DESIGNS.MINIMAL:
+        return cn(
+          "flex items-center gap-3 px-4 py-2.5 mb-0.5 transition-colors duration-150",
+          design.navItemStyle,
+          isActive
+            ? "border-l-white bg-white/5 text-white"
+            : "text-neutral-400 hover:bg-white/5 hover:text-white hover:border-l-neutral-500"
+        );
+      default:
+        return cn(
+          "flex items-center gap-2 px-3 py-2 rounded-lg mb-0.5 transition-colors text-xs",
+          isActive
+            ? "bg-white/10 text-white"
+            : "text-slate-300 hover:bg-white/5 hover:text-white"
+        );
+    }
+  };
 
   useEffect(() => {
     fetchShiftStatus();
@@ -142,11 +185,14 @@ export default function MainLayout() {
 
       {/* Sidebar */}
       <aside
-        className={cn("fixed top-0 left-0 bottom-0 w-64 z-40 text-white transform transition-all duration-300 ease-in-out overflow-y-auto",
+        className={cn(
+          "fixed top-0 left-0 bottom-0 z-40 text-white transform transition-all duration-300 ease-in-out overflow-y-auto",
           "lg:shadow-2xl",
-          showSidebar ? "translate-x-0" : "-translate-x-full"
+          showSidebar ? "translate-x-0" : "-translate-x-full",
+          design.sidebarWidth,
+          getSidebarClasses()
         )}
-        style={{ backgroundColor: colors.sidebar }}
+        style={{ backgroundColor: currentDesign === DESIGNS.CLASSIC ? colors.sidebar : undefined }}
         onMouseLeave={() => {
           if (!sidebarPinned) {
             setIsHovering(false);
@@ -155,19 +201,42 @@ export default function MainLayout() {
         }}
       >
         {/* Logo */}
-        <div className="p-2 border-b border-white/10">
+        <div className={cn(
+          "p-3 border-b",
+          currentDesign === DESIGNS.MODERN ? "border-white/10" : 
+          currentDesign === DESIGNS.MINIMAL ? "border-neutral-700" : "border-white/10"
+        )}>
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
-                <span className="text-brand-navy font-heading font-bold text-base">A</span>
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "flex items-center justify-center",
+                currentDesign === DESIGNS.MODERN ? "w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl shadow-lg" :
+                currentDesign === DESIGNS.MINIMAL ? "w-8 h-8 bg-white" : "w-8 h-8 bg-white rounded-lg"
+              )}>
+                <span className={cn(
+                  "font-heading font-bold",
+                  currentDesign === DESIGNS.MODERN ? "text-white text-lg" :
+                  currentDesign === DESIGNS.MINIMAL ? "text-black text-sm" : "text-brand-navy text-base"
+                )}>A</span>
               </div>
               <div>
-                <h1 className="font-heading font-bold text-sm leading-tight">ALPHA&CO</h1>
-                <p className="text-[10px] text-slate-300">POS System</p>
+                <h1 className={cn(
+                  "font-heading leading-tight",
+                  currentDesign === DESIGNS.MODERN ? "font-semibold text-base" :
+                  currentDesign === DESIGNS.MINIMAL ? "font-normal text-sm tracking-widest" : "font-bold text-sm"
+                )}>ALPHA&CO</h1>
+                <p className={cn(
+                  "text-slate-300",
+                  currentDesign === DESIGNS.MODERN ? "text-xs opacity-70" :
+                  currentDesign === DESIGNS.MINIMAL ? "text-[9px] tracking-wider text-neutral-500" : "text-[10px]"
+                )}>
+                  {currentDesign === DESIGNS.MINIMAL ? "POS" : "POS System"}
+                </p>
               </div>
             </div>
-            {/* Pin and Theme buttons - Desktop only */}
+            {/* Pin, Theme and Design buttons - Desktop only */}
             <div className="hidden lg:flex items-center gap-0.5">
+              <DesignSelector variant="ghost" size="icon" />
               <ThemeSelector variant="ghost" size="icon" />
               <Button
                 variant="ghost"
@@ -187,15 +256,26 @@ export default function MainLayout() {
         </div>
 
         {/* Shift Status */}
-        <div className="p-2 border-b border-white/10">
+        <div className={cn(
+          "p-2 border-b",
+          currentDesign === DESIGNS.MODERN ? "border-white/10" :
+          currentDesign === DESIGNS.MINIMAL ? "border-neutral-700 p-3" : "border-white/10"
+        )}>
           <div className={cn(
-            "p-2 rounded-lg text-xs",
-            currentShift ? "bg-green-500/20 text-green-200" : "bg-amber-500/20 text-amber-200"
+            "p-2 text-xs",
+            currentShift 
+              ? (currentDesign === DESIGNS.MODERN ? "bg-gradient-to-r from-green-500/20 to-emerald-500/20 text-green-200 rounded-xl border border-green-500/20" :
+                 currentDesign === DESIGNS.MINIMAL ? "bg-green-500/10 text-green-300 border-l-2 border-green-500" : 
+                 "bg-green-500/20 text-green-200 rounded-lg")
+              : (currentDesign === DESIGNS.MODERN ? "bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-200 rounded-xl border border-amber-500/20" :
+                 currentDesign === DESIGNS.MINIMAL ? "bg-amber-500/10 text-amber-300 border-l-2 border-amber-500" :
+                 "bg-amber-500/20 text-amber-200 rounded-lg")
           )}>
             <div className="flex items-center gap-1.5">
               <div className={cn(
                 "w-1.5 h-1.5 rounded-full",
-                currentShift ? "bg-green-400" : "bg-amber-400"
+                currentShift ? "bg-green-400" : "bg-amber-400",
+                currentDesign === DESIGNS.MODERN && "animate-pulse"
               )} />
               <span className="font-medium text-xs">
                 {currentShift ? "Caisse ouverte" : "Caisse fermée"}
@@ -210,27 +290,30 @@ export default function MainLayout() {
         </div>
 
         {/* Navigation */}
-        <nav className="p-1.5 flex-1 overflow-y-auto">
+        <nav className={cn(
+          "flex-1 overflow-y-auto",
+          currentDesign === DESIGNS.MODERN ? "p-2" :
+          currentDesign === DESIGNS.MINIMAL ? "p-0" : "p-1.5"
+        )}>
           {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
               onClick={() => setSidebarOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-2 px-3 py-2 rounded-lg mb-0.5 transition-colors text-xs",
-                  isActive
-                    ? "bg-white/10 text-white"
-                    : "text-slate-300 hover:bg-white/5 hover:text-white"
-                )
-              }
+              className={({ isActive }) => getNavItemClasses(isActive)}
             >
-              <item.icon className="w-4 h-4" />
+              <item.icon className={design.iconSize} />
               <span className="flex-1">{item.label}</span>
               {item.path === "/inventory" && stockAlerts > 0 && (
-                <Badge className="bg-red-500 text-white text-[10px] h-4">{stockAlerts}</Badge>
+                <Badge className={cn(
+                  "text-white text-[10px] h-4",
+                  currentDesign === DESIGNS.MODERN ? "bg-gradient-to-r from-red-500 to-pink-500" :
+                  currentDesign === DESIGNS.MINIMAL ? "bg-red-600 rounded-none" : "bg-red-500"
+                )}>{stockAlerts}</Badge>
               )}
-              <ChevronRight className="w-3 h-3 opacity-50" />
+              {currentDesign !== DESIGNS.MINIMAL && (
+                <ChevronRight className="w-3 h-3 opacity-50" />
+              )}
             </NavLink>
           ))}
         </nav>
@@ -266,8 +349,13 @@ export default function MainLayout() {
 
       {/* Main Content */}
       <main className={cn(
-        "flex-1 overflow-y-auto bg-brand-gray transition-all duration-300",
-        sidebarPinned && "lg:ml-64"
+        "flex-1 overflow-y-auto transition-all duration-300",
+        currentDesign === DESIGNS.MODERN ? "bg-gradient-to-br from-slate-100 via-purple-50 to-slate-100" :
+        currentDesign === DESIGNS.MINIMAL ? "bg-neutral-100" : "bg-brand-gray",
+        sidebarPinned && (
+          currentDesign === DESIGNS.MODERN ? "lg:ml-72" :
+          currentDesign === DESIGNS.MINIMAL ? "lg:ml-56" : "lg:ml-64"
+        )
       )}>
         <Outlet />
       </main>

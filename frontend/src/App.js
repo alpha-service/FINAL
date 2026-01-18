@@ -3,6 +3,7 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import MainLayout from "@/components/layout/MainLayout";
+import { DesignProvider } from "@/hooks/useDesign";
 
 // Lazy load pages for better performance
 const POSScreen = lazy(() => import("@/pages/POSScreen"));
@@ -27,30 +28,32 @@ const PageLoader = () => (
 
 function App() {
   return (
-    <div className="min-h-screen bg-brand-gray font-body">
-      <BrowserRouter>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
-            <Route path="/" element={<MainLayout />}>
-              <Route index element={<Navigate to="/pos" replace />} />
-              <Route path="pos" element={<POSScreen />} />
-              <Route path="sales" element={<SalesHistory />} />
-              <Route path="documents" element={<DocumentsHub />} />
-              <Route path="documents/:docId" element={<DocumentDetail />} />
-              <Route path="products" element={<Products />} />
-              <Route path="clients" element={<Clients />} />
-              <Route path="reports" element={<Reports />} />
-              <Route path="cash-register" element={<CashRegister />} />
-              <Route path="inventory" element={<Inventory />} />
-              <Route path="users" element={<Users />} />
-              <Route path="customers/:customerId/history" element={<CustomerHistory />} />
-              <Route path="settings" element={<Settings />} />
-            </Route>
-          </Routes>
-        </Suspense>
-      </BrowserRouter>
-      <Toaster position="top-right" richColors />
-    </div>
+    <DesignProvider>
+      <div className="min-h-screen bg-brand-gray font-body">
+        <BrowserRouter>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/" element={<MainLayout />}>
+                <Route index element={<Navigate to="/pos" replace />} />
+                <Route path="pos" element={<POSScreen />} />
+                <Route path="sales" element={<SalesHistory />} />
+                <Route path="documents" element={<DocumentsHub />} />
+                <Route path="documents/:docId" element={<DocumentDetail />} />
+                <Route path="products" element={<Products />} />
+                <Route path="clients" element={<Clients />} />
+                <Route path="reports" element={<Reports />} />
+                <Route path="cash-register" element={<CashRegister />} />
+                <Route path="inventory" element={<Inventory />} />
+                <Route path="users" element={<Users />} />
+                <Route path="customers/:customerId/history" element={<CustomerHistory />} />
+                <Route path="settings" element={<Settings />} />
+              </Route>
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
+        <Toaster position="top-right" richColors />
+      </div>
+    </DesignProvider>
   );
 }
 

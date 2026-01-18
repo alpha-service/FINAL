@@ -47,6 +47,8 @@ export default function Products() {
   const [viewMode, setViewMode] = useState("categories"); // "categories" | "all" - toggle between category navigation or all products
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
   const [formData, setFormData] = useState({
     sku: "",
     name_fr: "",
@@ -188,6 +190,8 @@ export default function Products() {
 
   const openCreateModal = () => {
     setEditingProduct(null);
+    setShowNewCategoryInput(false);
+    setNewCategoryName("");
     setFormData({
       sku: "",
       name_fr: "",
@@ -212,6 +216,8 @@ export default function Products() {
 
   const openEditModal = (product) => {
     setEditingProduct(product);
+    setShowNewCategoryInput(false);
+    setNewCategoryName("");
     setFormData({
       sku: product.sku || "",
       name_fr: product.name_fr || "",
@@ -237,8 +243,25 @@ export default function Products() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      let categoryId = formData.category_id;
+      
+      // If creating a new category
+      if (showNewCategoryInput && newCategoryName.trim()) {
+        const catResponse = await axios.post(`${API}/categories`, {
+          name_fr: newCategoryName.trim(),
+          name_nl: newCategoryName.trim()
+        });
+        categoryId = catResponse.data.id;
+        // Refresh categories list
+        await fetchCategories();
+        toast.success(`Catégorie "${newCategoryName}" créée`);
+        setNewCategoryName("");
+        setShowNewCategoryInput(false);
+      }
+      
       const data = {
         ...formData,
+        category_id: categoryId,
         price_retail: parseFloat(formData.price_retail) || 0,
         price_wholesale: parseFloat(formData.price_wholesale) || 0,
         price_purchase: parseFloat(formData.price_purchase) || 0,
@@ -258,6 +281,7 @@ export default function Products() {
       
       setShowModal(false);
       if (selectedCategory) fetchProducts(selectedCategory.id);
+      else if (viewMode === "all") fetchAllProducts();
     } catch (error) {
       toast.error("Erreur lors de la sauvegarde");
       console.error(error);
@@ -1021,16 +1045,49 @@ export default function Products() {
 
             <div>
               <Label htmlFor="category">Catégorie</Label>
-              <Select value={formData.category_id} onValueChange={(value) => setFormData({...formData, category_id: value})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionnez une catégorie" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map(cat => (
-                    <SelectItem key={cat.id} value={cat.id}>{cat.name_fr}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {showNewCategoryInput ? (
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Nom de la nouvelle catégorie"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      setShowNewCategoryInput(false);
+                      setNewCategoryName("");
+                    }}
+                  >
+                    Annuler
+                  </Button>
+                </div>
+              ) : (
+                <Select value={formData.category_id} onValueChange={(value) => {
+                  if (value === "__new__") {
+                    setShowNewCategoryInput(true);
+                  } else {
+                    setFormData({...formData, category_id: value});
+                  }
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionnez une catégorie" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__new__" className="text-brand-orange font-medium">
+                      <span className="flex items-center gap-2">
+                        <Plus className="w-4 h-4" />
+                        Nouvelle catégorie...
+                      </span>
+                    </SelectItem>
+                    {categories.map(cat => (
+                      <SelectItem key={cat.id} value={cat.id}>{cat.name_fr}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div className="grid grid-cols-4 gap-4">

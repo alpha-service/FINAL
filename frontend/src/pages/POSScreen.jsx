@@ -26,6 +26,8 @@ import { usePOSLayout } from "@/hooks/usePOSLayout";
 import ResizableHandle from "@/components/pos/ResizableHandle";
 import LayoutSelector from "@/components/pos/LayoutSelector";
 import { useTheme } from "@/hooks/useTheme";
+import { useDesign, DESIGNS } from "@/hooks/useDesign";
+import { cn } from "@/lib/utils";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -33,6 +35,7 @@ export default function POSScreen() {
   const navigate = useNavigate();
   const containerRef = useRef(null);
   const { colors } = useTheme();
+  const { currentDesign, design } = useDesign();
   
   // Layout system
   const {
@@ -50,7 +53,15 @@ export default function POSScreen() {
   
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [cart, setCart] = useState([]);
+  // Cart persistence - load from localStorage
+  const [cart, setCart] = useState(() => {
+    try {
+      const savedCart = localStorage.getItem('pos_cart');
+      return savedCart ? JSON.parse(savedCart) : [];
+    } catch { return []; }
+  });
+  // Customer persistence
+  const [savedCustomerId, setSavedCustomerId] = useState(() => localStorage.getItem('pos_customer_id'));
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [posViewMode, setPosViewMode] = useState("collections"); // NEW: "collections" | "products"
@@ -79,6 +90,19 @@ export default function POSScreen() {
   const [highlightedItemId, setHighlightedItemId] = useState(null);
   const [priceOverrideItem, setPriceOverrideItem] = useState(null);
   const [selectedItemId, setSelectedItemId] = useState(null);
+  
+  // Quick add product popup
+  const [showQuickAddProduct, setShowQuickAddProduct] = useState(false);
+  const [quickProductData, setQuickProductData] = useState({
+    name: "",
+    price: "",
+    qty: "1",
+    vat_rate: "21"
+  });
+  
+  // Refs for discount/price input navigation
+  const discountInputRefs = useRef({});
+  const priceInputRefs = useRef({});
 
   // Toggle compact cart and save preference
   const toggleCompactCart = () => {
@@ -93,17 +117,47 @@ export default function POSScreen() {
     localStorage.setItem('product_grid_size', size);
   };
 
-  // Get grid classes based on size - OPTIMIZED for more products
+  // Get grid classes based on size - OPTIMIZED for more products and mobile
   const getGridClasses = () => {
     switch (productGridSize) {
       case 'small':
-        return 'grid-cols-5 sm:grid-cols-7 md:grid-cols-9 lg:grid-cols-10';
+        return 'grid-cols-3 xs:grid-cols-5 sm:grid-cols-7 md:grid-cols-9 lg:grid-cols-10';
       case 'large':
         return 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5';
       default: // medium
-        return 'grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7';
+        return 'grid-cols-2 xs:grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7';
     }
   };
+
+  // Persist cart to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('pos_cart', JSON.stringify(cart));
+  }, [cart]);
+
+  // Persist selected customer
+  useEffect(() => {
+    if (selectedCustomer) {
+      localStorage.setItem('pos_customer_id', selectedCustomer.id);
+    } else {
+      localStorage.removeItem('pos_customer_id');
+    }
+  }, [selectedCustomer]);
+
+  // Load saved customer on mount
+  useEffect(() => {
+    const loadSavedCustomer = async () => {
+      const customerId = localStorage.getItem('pos_customer_id');
+      if (customerId && !selectedCustomer) {
+        try {
+          const res = await axios.get(`${API}/customers/${customerId}`);
+          setSelectedCustomer(res.data);
+        } catch (err) {
+          localStorage.removeItem('pos_customer_id');
+        }
+      }
+    };
+    loadSavedCustomer();
+  }, []);
 
   // Fetch products and categories
   useEffect(() => {
@@ -479,6 +533,43 @@ export default function POSScreen() {
     }
   };
 
+  // Get next/previous item index for keyboard navigation
+  const getNextItemIndex = (currentProductId) => {
+    const currentIndex = cart.findIndex(item => item.product_id === currentProductId);
+    return currentIndex < cart.length - 1 ? currentIndex + 1 : 0;
+  };
+
+  const getPrevItemIndex = (currentProductId) => {
+    const currentIndex = cart.findIndex(item => item.product_id === currentProductId);
+    return currentIndex > 0 ? currentIndex - 1 : cart.length - 1;
+  };
+
+  // Navigate to next item's discount field
+  const moveToNextDiscount = (currentProductId) => {
+    const nextIndex = getNextItemIndex(currentProductId);
+    const nextItem = cart[nextIndex];
+    if (nextItem) {
+      setEditingDiscountId(nextItem.product_id);
+      setTempDiscount({ type: nextItem.discount_type || "percent", value: nextItem.discount_value?.toString() || "" });
+      setTimeout(() => {
+        discountInputRefs.current[nextItem.product_id]?.focus();
+      }, 50);
+    }
+  };
+
+  // Navigate to next item's price field
+  const moveToNextPrice = (currentProductId) => {
+    const nextIndex = getNextItemIndex(currentProductId);
+    const nextItem = cart[nextIndex];
+    if (nextItem) {
+      setEditingPriceId(nextItem.product_id);
+      setTempPrice(nextItem.unit_price.toString());
+      setTimeout(() => {
+        priceInputRefs.current[nextItem.product_id]?.focus();
+      }, 50);
+    }
+  };
+
   // Update cart item price (override)
   const updateItemPrice = (productId, newPrice) => {
     const price = parseFloat(newPrice);
@@ -496,11 +587,14 @@ export default function POSScreen() {
     setTempPrice(currentPrice.toString());
   };
 
-  // Confirm price edit
-  const confirmPriceEdit = (productId) => {
+  // Confirm price edit and optionally move to next
+  const confirmPriceEdit = (productId, moveToNext = false) => {
     updateItemPrice(productId, tempPrice);
     setEditingPriceId(null);
     setTempPrice("");
+    if (moveToNext && cart.length > 1) {
+      moveToNextPrice(productId);
+    }
   };
 
   // Cancel price edit
@@ -543,18 +637,51 @@ export default function POSScreen() {
     setTempDiscount({ type: currentType || "percent", value: currentValue?.toString() || "" });
   };
 
-  // Confirm item discount
-  const confirmDiscountEdit = (productId) => {
+  // Confirm item discount and optionally move to next
+  const confirmDiscountEdit = (productId, moveToNext = false) => {
     applyLineDiscount(productId, tempDiscount.type, tempDiscount.value);
     setEditingDiscountId(null);
     setTempDiscount({ type: "percent", value: "" });
-    toast.success("Remise appliquée");
+    if (tempDiscount.value) {
+      toast.success("Remise appliquée");
+    }
+    if (moveToNext && cart.length > 1) {
+      moveToNextDiscount(productId);
+    }
   };
 
   // Cancel discount edit
   const cancelDiscountEdit = () => {
     setEditingDiscountId(null);
     setTempDiscount({ type: "percent", value: "" });
+  };
+
+  // Quick add product - add a custom product to cart without existing product
+  const handleQuickAddProduct = () => {
+    if (!quickProductData.name || !quickProductData.price) {
+      toast.error("Nom et prix requis");
+      return;
+    }
+    
+    const newItem = {
+      product_id: `quick_${Date.now()}`,
+      sku: `QUICK-${Date.now()}`,
+      name: quickProductData.name,
+      name_nl: quickProductData.name,
+      qty: parseInt(quickProductData.qty) || 1,
+      unit_price: parseFloat(quickProductData.price),
+      unit: "piece",
+      vat_rate: parseFloat(quickProductData.vat_rate) || 21,
+      discount_type: null,
+      discount_value: 0,
+      stock_qty: 999,
+      isQuickAdd: true
+    };
+    
+    setCart(prev => [...prev, newItem]);
+    setShowQuickAddProduct(false);
+    setQuickProductData({ name: "", price: "", qty: "1", vat_rate: "21" });
+    toast.success(`${newItem.name} ajouté au panier`);
   };
 
   // Remove item discount
@@ -893,9 +1020,17 @@ export default function POSScreen() {
   const CartContent = () => (
     <div className="flex flex-col h-full">
       {/* Cart Header */}
-      <div className="p-2 border-b border-slate-200 bg-white">
+      <div className={cn(
+        "p-2 border-b",
+        currentDesign === DESIGNS.MODERN ? "bg-white/80 backdrop-blur-xl border-purple-200/50" :
+        currentDesign === DESIGNS.MINIMAL ? "bg-white border-neutral-300" : "bg-white border-slate-200"
+      )}>
         <div className="flex items-center justify-between mb-2">
-          <h2 className="font-heading font-bold text-sm text-brand-navy">
+          <h2 className={cn(
+            "font-heading font-bold text-sm",
+            currentDesign === DESIGNS.MODERN ? "text-purple-900" :
+            currentDesign === DESIGNS.MINIMAL ? "text-black tracking-wider" : "text-brand-navy"
+          )}>
             Panier / Winkelwagen
           </h2>
           <div className="flex items-center gap-1">
@@ -903,13 +1038,25 @@ export default function POSScreen() {
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 w-6 p-0"
+              className={cn(
+                "h-6 w-6 p-0",
+                currentDesign === DESIGNS.MODERN ? "hover:bg-purple-100 rounded-full" :
+                currentDesign === DESIGNS.MINIMAL ? "hover:bg-neutral-200 rounded-none" : ""
+              )}
               onClick={toggleCompactCart}
               title={compactCart ? "Vue normale" : "Vue compacte"}
             >
               {compactCart ? <Maximize2 className="w-3 h-3" /> : <Minimize2 className="w-3 h-3" />}
             </Button>
-            <Badge variant="secondary" style={{ backgroundColor: colors.primary }} className="text-white text-xs">
+            <Badge 
+              variant="secondary" 
+              className={cn(
+                "text-white text-xs",
+                currentDesign === DESIGNS.MODERN ? "bg-purple-600 rounded-full" :
+                currentDesign === DESIGNS.MINIMAL ? "bg-black rounded-none" : ""
+              )}
+              style={{ backgroundColor: currentDesign === DESIGNS.CLASSIC ? colors.primary : undefined }}
+            >
               {cart.length}
             </Badge>
           </div>
@@ -918,9 +1065,17 @@ export default function POSScreen() {
         {/* Customer selection */}
         <div>
           {selectedCustomer ? (
-            <div className="flex items-center justify-between bg-slate-50 rounded p-1.5">
+            <div className={cn(
+              "flex items-center justify-between p-1.5",
+              currentDesign === DESIGNS.MODERN ? "bg-purple-50 rounded-xl" :
+              currentDesign === DESIGNS.MINIMAL ? "bg-neutral-100 rounded-none" : "bg-slate-50 rounded"
+            )}>
               <div className="flex items-center gap-1.5">
-                <User className="w-3 h-3 text-brand-navy" />
+                <User className={cn(
+                  "w-3 h-3",
+                  currentDesign === DESIGNS.MODERN ? "text-purple-600" :
+                  currentDesign === DESIGNS.MINIMAL ? "text-black" : "text-brand-navy"
+                )} />
                 <span className="text-xs font-medium truncate">{selectedCustomer.name}</span>
               </div>
               <Button
@@ -935,7 +1090,11 @@ export default function POSScreen() {
           ) : (
             <Button
               variant="outline"
-              className="w-full h-7 justify-start text-xs border-dashed"
+              className={cn(
+                "w-full h-7 justify-start text-xs border-dashed",
+                currentDesign === DESIGNS.MODERN ? "rounded-xl border-purple-300 hover:bg-purple-50" :
+                currentDesign === DESIGNS.MINIMAL ? "rounded-none border-neutral-400 border-2" : ""
+              )}
               onClick={() => setShowCustomerSelect(true)}
               data-testid="select-customer-btn"
             >
@@ -947,23 +1106,47 @@ export default function POSScreen() {
       </div>
 
       {/* Cart Items - COMPACT or NORMAL mode */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className={cn(
+        "flex-1",
+        currentDesign === DESIGNS.MODERN ? "bg-gradient-to-b from-purple-50/30 to-white" :
+        currentDesign === DESIGNS.MINIMAL ? "bg-neutral-50" : ""
+      )}>
         {cart.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
-            <ShoppingCart className="w-12 h-12 mb-3 opacity-30" />
+            <ShoppingCart className={cn(
+              "w-12 h-12 mb-3 opacity-30",
+              currentDesign === DESIGNS.MODERN ? "text-purple-400" :
+              currentDesign === DESIGNS.MINIMAL ? "text-neutral-400" : ""
+            )} />
             <p className="text-sm">Panier vide / Lege winkelwagen</p>
           </div>
         ) : compactCart ? (
           /* COMPACT MODE - Table-like for maximum items with discount and TVA */
-          <div className="divide-y divide-slate-100">
+          <div className={cn(
+            "divide-y",
+            currentDesign === DESIGNS.MODERN ? "divide-purple-100" :
+            currentDesign === DESIGNS.MINIMAL ? "divide-neutral-200" : "divide-slate-100"
+          )}>
             {cart.map((item) => {
               const lineCalc = calculateLineItem(item);
               return (
               <div
                 key={item.product_id}
-                className={`flex items-center gap-1.5 px-2 py-1.5 hover:bg-slate-50 ${
-                  highlightedItemId === item.product_id ? 'bg-orange-50' : ''
-                } ${item.priceOverridden ? 'bg-amber-50' : ''} ${item.discount_value > 0 ? 'bg-green-50' : ''}`}
+                className={cn(
+                  "flex items-center gap-1.5 px-2 py-1.5",
+                  design.transition,
+                  currentDesign === DESIGNS.MODERN ? "hover:bg-purple-50" :
+                  currentDesign === DESIGNS.MINIMAL ? "hover:bg-neutral-100" : "hover:bg-slate-50",
+                  highlightedItemId === item.product_id && (
+                    currentDesign === DESIGNS.MODERN ? "bg-purple-100" :
+                    currentDesign === DESIGNS.MINIMAL ? "bg-neutral-200" : "bg-orange-50"
+                  ),
+                  item.priceOverridden && "bg-amber-50",
+                  item.discount_value > 0 && (
+                    currentDesign === DESIGNS.MODERN ? "bg-green-50/50" :
+                    currentDesign === DESIGNS.MINIMAL ? "bg-green-50" : "bg-green-50"
+                  )
+                )}
               >
                 {/* Product info - compact */}
                 <div className="flex-1 min-w-0">
@@ -979,7 +1162,11 @@ export default function POSScreen() {
                 </div>
                 
                 {/* Quantity controls - ultra compact */}
-                <div className="flex items-center gap-0.5 bg-slate-100 rounded px-1">
+                <div className={cn(
+                  "flex items-center gap-0.5 px-1",
+                  currentDesign === DESIGNS.MODERN ? "bg-purple-100 rounded-full" :
+                  currentDesign === DESIGNS.MINIMAL ? "bg-neutral-200 rounded-none" : "bg-slate-100 rounded"
+                )}>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1003,7 +1190,10 @@ export default function POSScreen() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className={`h-5 w-5 p-0 ${item.discount_value > 0 ? 'text-green-600' : 'text-muted-foreground'}`}
+                  className={cn(
+                    "h-5 w-5 p-0",
+                    item.discount_value > 0 ? "text-green-600" : "text-muted-foreground"
+                  )}
                   onClick={() => startEditingDiscount(item.product_id, item.discount_type, item.discount_value)}
                   title="Remise"
                 >
@@ -1014,13 +1204,25 @@ export default function POSScreen() {
                 {editingPriceId === item.product_id ? (
                   <div className="flex items-center gap-0.5">
                     <Input
+                      ref={(el) => priceInputRefs.current[item.product_id] = el}
                       type="number"
                       step="0.01"
-                      className="h-5 w-14 text-[10px] p-1"
+                      className={cn(
+                        "h-5 w-14 text-[10px] p-1",
+                        currentDesign === DESIGNS.MODERN ? "rounded-lg" :
+                        currentDesign === DESIGNS.MINIMAL ? "rounded-none" : ""
+                      )}
                       value={tempPrice}
                       onChange={(e) => setTempPrice(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') confirmPriceEdit(item.product_id);
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          confirmPriceEdit(item.product_id, true);
+                        }
+                        if (e.key === 'Tab') {
+                          e.preventDefault();
+                          confirmPriceEdit(item.product_id, true);
+                        }
                         if (e.key === 'Escape') cancelPriceEdit();
                       }}
                       onBlur={() => confirmPriceEdit(item.product_id)}
@@ -1110,6 +1312,7 @@ export default function POSScreen() {
                     <div className="flex items-center gap-1">
                       <span className="text-[10px] text-muted-foreground">€</span>
                       <Input
+                        ref={(el) => priceInputRefs.current[item.product_id] = el}
                         type="number"
                         step="0.01"
                         min="0"
@@ -1117,7 +1320,14 @@ export default function POSScreen() {
                         value={tempPrice}
                         onChange={(e) => setTempPrice(e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') confirmPriceEdit(item.product_id);
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            confirmPriceEdit(item.product_id, true);
+                          }
+                          if (e.key === 'Tab') {
+                            e.preventDefault();
+                            confirmPriceEdit(item.product_id, true);
+                          }
                           if (e.key === 'Escape') cancelPriceEdit();
                         }}
                         onBlur={() => confirmPriceEdit(item.product_id)}
@@ -1152,6 +1362,7 @@ export default function POSScreen() {
                         <option value="fixed">€</option>
                       </select>
                       <Input
+                        ref={(el) => discountInputRefs.current[item.product_id] = el}
                         type="number"
                         step="0.01"
                         min="0"
@@ -1159,7 +1370,14 @@ export default function POSScreen() {
                         value={tempDiscount.value}
                         onChange={(e) => setTempDiscount(prev => ({ ...prev, value: e.target.value }))}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') confirmDiscountEdit(item.product_id);
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            confirmDiscountEdit(item.product_id, true);
+                          }
+                          if (e.key === 'Tab') {
+                            e.preventDefault();
+                            confirmDiscountEdit(item.product_id, true);
+                          }
                           if (e.key === 'Escape') cancelDiscountEdit();
                         }}
                         placeholder="0"
@@ -1218,7 +1436,11 @@ export default function POSScreen() {
                 </div>
                 
                 {/* Line Total Row */}
-                <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                <div className={cn(
+                  "flex items-center justify-between pt-1 border-t",
+                  currentDesign === DESIGNS.MODERN ? "border-purple-100" :
+                  currentDesign === DESIGNS.MINIMAL ? "border-neutral-200" : "border-slate-100"
+                )}>
                   <div className="text-[10px] text-muted-foreground">
                     {item.discount_value > 0 && (
                       <span className="text-green-600">
@@ -1227,7 +1449,11 @@ export default function POSScreen() {
                     )}
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-brand-navy text-sm">
+                    <p className={cn(
+                      "font-bold text-sm",
+                      currentDesign === DESIGNS.MODERN ? "text-purple-900" :
+                      currentDesign === DESIGNS.MINIMAL ? "text-black" : "text-brand-navy"
+                    )}>
                       €{lineCalc.afterDiscount.toFixed(2)}
                     </p>
                     <p className="text-[9px] text-muted-foreground">
@@ -1242,7 +1468,29 @@ export default function POSScreen() {
       </ScrollArea>
 
       {/* Cart Footer */}
-      <div className="p-2 border-t border-slate-200 bg-white space-y-2">
+      <div className={cn(
+        "p-2 border-t space-y-2",
+        currentDesign === DESIGNS.MODERN ? "bg-white/80 backdrop-blur-xl border-purple-200/50" :
+        currentDesign === DESIGNS.MINIMAL ? "bg-white border-neutral-300" : "bg-white border-slate-200"
+      )}>
+        {/* Quick Add Product Button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn(
+            "w-full h-7 border-dashed text-xs",
+            currentDesign === DESIGNS.MODERN 
+              ? "text-blue-600 hover:bg-blue-50 border-blue-300 rounded-full" 
+              : currentDesign === DESIGNS.MINIMAL 
+              ? "text-black hover:bg-neutral-100 border-neutral-400 rounded-none border-2" 
+              : "text-blue-600 hover:bg-blue-50"
+          )}
+          onClick={() => setShowQuickAddProduct(true)}
+        >
+          <Plus className="w-3 h-3 mr-1" />
+          Ajouter produit rapide
+        </Button>
+        
         {/* Totals */}
         <div className="space-y-0.5 text-xs">
           <div className="flex justify-between items-center">
@@ -1253,8 +1501,16 @@ export default function POSScreen() {
             <span className="text-muted-foreground">TVA (21%)</span>
             <span className="font-medium">€{totals.vatTotal}</span>
           </div>
-          <Separator className="my-1" />
-          <div className="flex justify-between items-center text-base font-bold text-brand-navy">
+          <Separator className={cn(
+            "my-1",
+            currentDesign === DESIGNS.MODERN ? "bg-purple-200" :
+            currentDesign === DESIGNS.MINIMAL ? "bg-neutral-300" : ""
+          )} />
+          <div className={cn(
+            "flex justify-between items-center text-base font-bold",
+            currentDesign === DESIGNS.MODERN ? "text-purple-900" :
+            currentDesign === DESIGNS.MINIMAL ? "text-black" : "text-brand-navy"
+          )}>
             <span>TOTAL</span>
             <span className="price-tag">€{totals.total}</span>
           </div>
@@ -1264,13 +1520,24 @@ export default function POSScreen() {
         <Button
           variant="outline"
           size="sm"
-          className="w-full h-7 border-dashed text-brand-orange hover:bg-brand-orange/5 text-xs"
+          className={cn(
+            "w-full h-7 border-dashed text-xs",
+            currentDesign === DESIGNS.MODERN 
+              ? "text-purple-600 hover:bg-purple-50 border-purple-300 rounded-full" 
+              : currentDesign === DESIGNS.MINIMAL 
+              ? "text-black hover:bg-neutral-100 border-neutral-400 rounded-none border-2" 
+              : "text-brand-orange hover:bg-brand-orange/5"
+          )}
           onClick={() => setShowDiscountDialog(true)}
           data-testid="global-discount-btn"
         >
           REMISE
           {globalDiscount.value > 0 && (
-            <Badge className="ml-1.5 bg-brand-orange text-[10px] h-4">
+            <Badge className={cn(
+              "ml-1.5 text-[10px] h-4",
+              currentDesign === DESIGNS.MODERN ? "bg-purple-600 rounded-full" :
+              currentDesign === DESIGNS.MINIMAL ? "bg-black rounded-none" : "bg-brand-orange"
+            )}>
               {globalDiscount.type === "percent" ? `${globalDiscount.value}%` : `€${globalDiscount.value}`}
             </Badge>
           )}
@@ -1282,7 +1549,11 @@ export default function POSScreen() {
             <Button
               variant="outline"
               size="sm"
-              className="h-8 text-xs"
+              className={cn(
+                "h-8 text-xs",
+                currentDesign === DESIGNS.MODERN ? "rounded-xl hover:bg-red-50 hover:text-red-600 hover:border-red-200" :
+                currentDesign === DESIGNS.MINIMAL ? "rounded-none border-2" : ""
+              )}
               onClick={clearCart}
               disabled={cart.length === 0}
               data-testid="clear-cart-btn"
@@ -1294,14 +1565,22 @@ export default function POSScreen() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 text-xs col-span-2"
+                  className={cn(
+                    "h-8 text-xs col-span-2",
+                    currentDesign === DESIGNS.MODERN ? "rounded-xl" :
+                    currentDesign === DESIGNS.MINIMAL ? "rounded-none border-2" : ""
+                  )}
                   disabled={cart.length === 0}
                 >
                   <FileText className="w-3 h-3 mr-1" />
                   Document
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end" className={cn(
+                "w-48",
+                currentDesign === DESIGNS.MODERN ? "rounded-2xl shadow-xl shadow-purple-500/10" :
+                currentDesign === DESIGNS.MINIMAL ? "rounded-none border-2 border-black" : ""
+              )}>
                 <DropdownMenuLabel className="text-[10px] text-muted-foreground">Créer un document</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSaveAsDevis} className="text-xs">
@@ -1330,7 +1609,14 @@ export default function POSScreen() {
             </DropdownMenu>
           </div>
           <Button
-            className="w-full bg-brand-orange hover:bg-brand-orange/90 pay-button h-10 text-sm font-bold"
+            className={cn(
+              "w-full pay-button h-10 text-sm font-bold",
+              currentDesign === DESIGNS.MODERN 
+                ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl shadow-lg shadow-purple-500/20" 
+                : currentDesign === DESIGNS.MINIMAL 
+                ? "bg-black hover:bg-neutral-800 rounded-none" 
+                : "bg-brand-orange hover:bg-brand-orange/90"
+            )}
             onClick={() => setShowPayment(true)}
             disabled={cart.length === 0}
             data-testid="pay-btn"
@@ -1345,9 +1631,17 @@ export default function POSScreen() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-brand-gray">
+      <div className={cn(
+        "flex items-center justify-center h-screen",
+        currentDesign === DESIGNS.MODERN ? "bg-gradient-to-br from-slate-100 via-purple-50 to-slate-100" :
+        currentDesign === DESIGNS.MINIMAL ? "bg-neutral-100" : "bg-brand-gray"
+      )}>
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-brand-navy border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className={cn(
+            "w-12 h-12 border-4 border-t-transparent rounded-full animate-spin mx-auto mb-4",
+            currentDesign === DESIGNS.MODERN ? "border-purple-600" :
+            currentDesign === DESIGNS.MINIMAL ? "border-black" : "border-brand-navy"
+          )}></div>
           <p className="text-muted-foreground">Chargement / Laden...</p>
         </div>
       </div>
@@ -1355,19 +1649,43 @@ export default function POSScreen() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-brand-gray" data-testid="pos-screen">
+    <div className={cn(
+      "h-screen flex flex-col",
+      currentDesign === DESIGNS.MODERN ? "bg-gradient-to-br from-slate-100 via-purple-50 to-slate-100" :
+      currentDesign === DESIGNS.MINIMAL ? "bg-neutral-100" : "bg-brand-gray"
+    )} data-testid="pos-screen">
       {/* Header */}
       <header 
-        className="text-white px-4 py-3 flex items-center justify-between shadow-lg z-10"
-        style={{ backgroundColor: colors.sidebar }}
+        className={cn(
+          "text-white px-4 py-3 flex items-center justify-between z-10",
+          currentDesign === DESIGNS.MODERN ? "bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 shadow-xl shadow-purple-500/10" :
+          currentDesign === DESIGNS.MINIMAL ? "bg-black border-b-2 border-neutral-800" : "shadow-lg"
+        )}
+        style={{ backgroundColor: currentDesign === DESIGNS.CLASSIC ? colors.sidebar : undefined }}
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-            <span className="text-brand-navy font-heading font-bold text-lg">A</span>
+          <div className={cn(
+            "flex items-center justify-center",
+            currentDesign === DESIGNS.MODERN ? "w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl shadow-lg" :
+            currentDesign === DESIGNS.MINIMAL ? "w-10 h-10 bg-white" : "w-10 h-10 bg-white rounded-lg"
+          )}>
+            <span className={cn(
+              "font-heading font-bold text-lg",
+              currentDesign === DESIGNS.MODERN ? "text-white" :
+              currentDesign === DESIGNS.MINIMAL ? "text-black" : "text-brand-navy"
+            )}>A</span>
           </div>
           <div>
-            <h1 className="font-heading font-bold text-lg leading-tight">ALPHA&CO</h1>
-            <p className="text-xs text-slate-300 hidden sm:block">BOUWMATERIALEN & DESIGN</p>
+            <h1 className={cn(
+              "font-heading leading-tight",
+              currentDesign === DESIGNS.MODERN ? "font-semibold text-lg" :
+              currentDesign === DESIGNS.MINIMAL ? "font-normal text-lg tracking-widest" : "font-bold text-lg"
+            )}>ALPHA&CO</h1>
+            <p className={cn(
+              "hidden sm:block",
+              currentDesign === DESIGNS.MODERN ? "text-xs text-purple-200" :
+              currentDesign === DESIGNS.MINIMAL ? "text-xs text-neutral-400 tracking-wider" : "text-xs text-slate-300"
+            )}>BOUWMATERIALEN & DESIGN</p>
           </div>
         </div>
         
@@ -1426,7 +1744,11 @@ export default function POSScreen() {
           }}
         >
           {/* Search and Categories */}
-          <div className="p-4 bg-white border-b border-slate-200 space-y-3">
+          <div className={cn(
+            "p-4 border-b space-y-3",
+            currentDesign === DESIGNS.MODERN ? "bg-white/80 backdrop-blur-xl border-purple-200/50" :
+            currentDesign === DESIGNS.MINIMAL ? "bg-white border-neutral-300" : "bg-white border-slate-200"
+          )}>
             {/* Search and Zoom Controls */}
             {/* Breadcrumb and Back Button for products view */}
             {posViewMode === "products" && selectedCategory && (
@@ -1435,21 +1757,42 @@ export default function POSScreen() {
                   variant="ghost"
                   size="sm"
                   onClick={goBackToCollections}
-                  className="h-8 px-2 hover:bg-brand-orange/10"
+                  className={cn(
+                    "h-8 px-2",
+                    currentDesign === DESIGNS.MODERN ? "hover:bg-purple-100 rounded-xl" :
+                    currentDesign === DESIGNS.MINIMAL ? "hover:bg-neutral-200 rounded-none" : "hover:bg-brand-orange/10"
+                  )}
                 >
                   <ArrowLeft className="w-4 h-4" />
                 </Button>
                 <div className="flex items-center gap-1 text-sm text-muted-foreground">
                   <button 
                     onClick={goBackToCollections}
-                    className="hover:text-brand-orange flex items-center gap-1"
+                    className={cn(
+                      "flex items-center gap-1",
+                      currentDesign === DESIGNS.MODERN ? "hover:text-purple-600" :
+                      currentDesign === DESIGNS.MINIMAL ? "hover:text-black" : "hover:text-brand-orange"
+                    )}
                   >
                     <Layers className="w-4 h-4" />
                     Collections
                   </button>
                   <ChevronRight className="w-4 h-4" />
-                  <span className="text-brand-navy font-medium">{selectedCategory.name_fr}</span>
-                  <Badge variant="secondary" className="ml-2">{filteredProducts.length}</Badge>
+                  <span className={cn(
+                    "font-medium",
+                    currentDesign === DESIGNS.MODERN ? "text-purple-900" :
+                    currentDesign === DESIGNS.MINIMAL ? "text-black" : "text-brand-navy"
+                  )}>{selectedCategory.name_fr}</span>
+                  <Badge 
+                    variant="secondary" 
+                    className={cn(
+                      "ml-2",
+                      currentDesign === DESIGNS.MODERN ? "bg-purple-100 text-purple-700 rounded-full" :
+                      currentDesign === DESIGNS.MINIMAL ? "bg-neutral-200 text-black rounded-none" : ""
+                    )}
+                  >
+                    {filteredProducts.length}
+                  </Badge>
                 </div>
               </div>
             )}
@@ -1457,10 +1800,18 @@ export default function POSScreen() {
             {/* Search */}
             <div className="flex items-center gap-3">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Search className={cn(
+                  "absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5",
+                  currentDesign === DESIGNS.MODERN ? "text-purple-400" :
+                  currentDesign === DESIGNS.MINIMAL ? "text-neutral-500" : "text-muted-foreground"
+                )} />
                 <Input
                   placeholder={posViewMode === "collections" ? "Rechercher une collection..." : "Rechercher SKU, nom... / Zoek SKU, naam..."}
-                  className="pl-10 h-12 text-base search-input bg-slate-50 border-slate-200"
+                  className={cn(
+                    "pl-10 h-12 text-base search-input",
+                    currentDesign === DESIGNS.MODERN ? "bg-purple-50/50 border-purple-200 rounded-2xl focus:ring-purple-400 focus:border-purple-400" :
+                    currentDesign === DESIGNS.MINIMAL ? "bg-neutral-100 border-neutral-300 rounded-none focus:ring-black focus:border-black" : "bg-slate-50 border-slate-200"
+                  )}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   data-testid="product-search"
@@ -1515,7 +1866,11 @@ export default function POSScreen() {
                 <Button
                   variant={selectedSize === null ? "secondary" : "ghost"}
                   size="sm"
-                  className="shrink-0 h-7 text-xs"
+                  className={cn(
+                    "shrink-0 h-7 text-xs",
+                    currentDesign === DESIGNS.MODERN ? "rounded-full" :
+                    currentDesign === DESIGNS.MINIMAL ? "rounded-none" : ""
+                  )}
                   onClick={() => setSelectedSize(null)}
                 >
                   Toutes tailles
@@ -1525,7 +1880,15 @@ export default function POSScreen() {
                     key={size}
                     variant={selectedSize === size ? "secondary" : "ghost"}
                     size="sm"
-                    className={`shrink-0 h-7 text-xs ${selectedSize === size ? 'bg-brand-orange/20 text-brand-orange' : ''}`}
+                    className={cn(
+                      "shrink-0 h-7 text-xs",
+                      currentDesign === DESIGNS.MODERN ? "rounded-full" :
+                      currentDesign === DESIGNS.MINIMAL ? "rounded-none" : "",
+                      selectedSize === size && (
+                        currentDesign === DESIGNS.MODERN ? "bg-purple-100 text-purple-700" :
+                        currentDesign === DESIGNS.MINIMAL ? "bg-black text-white" : "bg-brand-orange/20 text-brand-orange"
+                      )
+                    )}
                     onClick={() => setSelectedSize(selectedSize === size ? null : size)}
                   >
                     {size}
@@ -1537,8 +1900,12 @@ export default function POSScreen() {
 
           {/* Collections Grid - when in collections view */}
           {posViewMode === "collections" && (
-            <ScrollArea className="flex-1 p-3">
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3">
+            <ScrollArea className={cn(
+              "flex-1 p-3",
+              currentDesign === DESIGNS.MODERN ? "bg-gradient-to-b from-purple-50/30 to-transparent" :
+              currentDesign === DESIGNS.MINIMAL ? "bg-neutral-50" : ""
+            )}>
+              <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2 sm:gap-3">
                 {loading ? (
                   <div className="col-span-full text-center py-12 text-muted-foreground">
                     Chargement...
@@ -1552,10 +1919,25 @@ export default function POSScreen() {
                     <button
                       key={category.id}
                       onClick={() => setSelectedCategory(category)}
-                      className="group bg-white rounded-xl border border-slate-200 p-3 hover:border-brand-orange hover:shadow-lg transition-all duration-200 text-left active:scale-95"
+                      className={cn(
+                        "group p-3 text-left active:scale-95",
+                        design.transition,
+                        currentDesign === DESIGNS.MODERN 
+                          ? "bg-white/80 backdrop-blur-sm rounded-2xl border border-purple-200/50 hover:border-purple-400 hover:shadow-xl hover:shadow-purple-500/10" 
+                          : currentDesign === DESIGNS.MINIMAL 
+                          ? "bg-white rounded-none border-2 border-neutral-200 hover:border-black" 
+                          : "bg-white rounded-xl border border-slate-200 hover:border-brand-orange hover:shadow-lg"
+                      )}
                     >
                       <div className="flex flex-col items-center text-center">
-                        <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-2 transition-colors bg-gradient-to-br from-brand-orange/10 to-brand-navy/10 group-hover:from-brand-orange/20 group-hover:to-brand-navy/20 overflow-hidden">
+                        <div className={cn(
+                          "w-14 h-14 flex items-center justify-center mb-2 overflow-hidden",
+                          currentDesign === DESIGNS.MODERN 
+                            ? "rounded-2xl bg-gradient-to-br from-purple-100 to-pink-100 group-hover:from-purple-200 group-hover:to-pink-200" 
+                            : currentDesign === DESIGNS.MINIMAL 
+                            ? "rounded-none bg-neutral-100 group-hover:bg-neutral-200" 
+                            : "rounded-xl bg-gradient-to-br from-brand-orange/10 to-brand-navy/10 group-hover:from-brand-orange/20 group-hover:to-brand-navy/20"
+                        )}>
                           {category.image_url ? (
                             <img 
                               src={category.image_url} 
@@ -1563,13 +1945,29 @@ export default function POSScreen() {
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <FolderOpen className="w-7 h-7 text-brand-orange" />
+                            <FolderOpen className={cn(
+                              "w-7 h-7",
+                              currentDesign === DESIGNS.MODERN ? "text-purple-500" :
+                              currentDesign === DESIGNS.MINIMAL ? "text-black" : "text-brand-orange"
+                            )} />
                           )}
                         </div>
-                        <h3 className="font-medium text-xs text-brand-navy group-hover:text-brand-orange transition-colors line-clamp-2 mb-0.5">
+                        <h3 className={cn(
+                          "font-medium text-xs line-clamp-2 mb-0.5",
+                          design.transition,
+                          currentDesign === DESIGNS.MODERN ? "text-slate-700 group-hover:text-purple-600" :
+                          currentDesign === DESIGNS.MINIMAL ? "text-black group-hover:text-neutral-600" : "text-brand-navy group-hover:text-brand-orange"
+                        )}>
                           {category.name_fr}
                         </h3>
-                        <Badge variant="secondary" className="text-[10px] px-1.5">
+                        <Badge 
+                          variant="secondary" 
+                          className={cn(
+                            "text-[10px] px-1.5",
+                            currentDesign === DESIGNS.MODERN ? "bg-purple-100 text-purple-600 rounded-full" :
+                            currentDesign === DESIGNS.MINIMAL ? "bg-neutral-200 text-black rounded-none" : ""
+                          )}
+                        >
                           {category.product_count || 0}
                         </Badge>
                       </div>
@@ -1582,11 +1980,23 @@ export default function POSScreen() {
 
           {/* Products Grid - when in products view */}
           {posViewMode === "products" && (
-            <ScrollArea className="flex-1 p-2 relative">
+            <ScrollArea className={cn(
+              "flex-1 p-2 relative",
+              currentDesign === DESIGNS.MODERN ? "bg-gradient-to-b from-purple-50/20 to-transparent" :
+              currentDesign === DESIGNS.MINIMAL ? "bg-neutral-50" : ""
+            )}>
               {/* Subtle loading overlay when switching categories */}
               {loadingProducts && (
-                <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center">
-                  <div className="animate-spin h-8 w-8 border-4 border-brand-orange border-t-transparent rounded-full"></div>
+                <div className={cn(
+                  "absolute inset-0 z-10 flex items-center justify-center",
+                  currentDesign === DESIGNS.MODERN ? "bg-white/80 backdrop-blur-sm" :
+                  currentDesign === DESIGNS.MINIMAL ? "bg-white/90" : "bg-white/60"
+                )}>
+                  <div className={cn(
+                    "animate-spin h-8 w-8 border-4 border-t-transparent rounded-full",
+                    currentDesign === DESIGNS.MODERN ? "border-purple-500" :
+                    currentDesign === DESIGNS.MINIMAL ? "border-black" : "border-brand-orange"
+                  )}></div>
                 </div>
               )}
               {filteredProducts.length === 0 && !loadingProducts ? (
@@ -1596,7 +2006,11 @@ export default function POSScreen() {
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    className="mt-3"
+                    className={cn(
+                      "mt-3",
+                      currentDesign === DESIGNS.MODERN ? "rounded-full" :
+                      currentDesign === DESIGNS.MINIMAL ? "rounded-none border-2" : ""
+                    )}
                     onClick={goBackToCollections}
                   >
                     <ArrowLeft className="w-4 h-4 mr-1" />
@@ -1699,16 +2113,25 @@ export default function POSScreen() {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
-                          className={`product-card bg-white border border-slate-200 rounded-lg overflow-hidden text-left focus:outline-none focus:ring-2 focus:ring-brand-navy/20 hover:border-brand-navy hover:shadow-md transition-all active:scale-95 ${
-                            productGridSize === 'small' ? 'p-1' : ''
-                          }`}
+                          className={cn(
+                            "product-card overflow-hidden text-left focus:outline-none active:scale-95",
+                            design.productCardStyle,
+                            design.transition,
+                            productGridSize === 'small' ? 'p-1' : '',
+                            currentDesign === DESIGNS.MODERN && "focus:ring-2 focus:ring-purple-500/30",
+                            currentDesign === DESIGNS.MINIMAL && "focus:ring-0 focus:border-black",
+                            currentDesign === DESIGNS.CLASSIC && "focus:ring-2 focus:ring-brand-navy/20"
+                          )}
                           onClick={() => addToCart(product)}
                           data-testid={`product-${product.id}`}
                         >
                           {/* Image - responsive size */}
-                          <div className={`bg-slate-100 relative overflow-hidden ${
+                          <div className={cn(
+                            "relative overflow-hidden",
+                            currentDesign === DESIGNS.MODERN ? "bg-gradient-to-br from-slate-100 to-slate-200" :
+                            currentDesign === DESIGNS.MINIMAL ? "bg-neutral-100" : "bg-slate-100",
                             productGridSize === 'small' ? 'aspect-square' : 'aspect-[4/3]'
-                          }`}>
+                          )}>
                             {product.image_url ? (
                               <img
                                 src={product.image_url}
@@ -1900,6 +2323,79 @@ export default function POSScreen() {
             </Button>
             <Button className="bg-brand-orange hover:bg-brand-orange/90" onClick={handleApplyDiscount}>
               Appliquer / Toepassen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Add Product Dialog */}
+      <Dialog open={showQuickAddProduct} onOpenChange={setShowQuickAddProduct}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ajouter un produit rapide</DialogTitle>
+            <DialogDescription>
+              Ajouter un produit au panier sans l'enregistrer
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Nom du produit *</label>
+              <Input
+                value={quickProductData.name}
+                onChange={(e) => setQuickProductData(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Ex: Service, Frais divers..."
+                autoFocus
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Prix unitaire *</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">€</span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={quickProductData.price}
+                    onChange={(e) => setQuickProductData(prev => ({ ...prev, price: e.target.value }))}
+                    className="pl-8"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Quantité</label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={quickProductData.qty}
+                  onChange={(e) => setQuickProductData(prev => ({ ...prev, qty: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">TVA %</label>
+              <select
+                className="w-full h-10 border rounded-md px-3"
+                value={quickProductData.vat_rate}
+                onChange={(e) => setQuickProductData(prev => ({ ...prev, vat_rate: e.target.value }))}
+              >
+                <option value="21">21% (Standard)</option>
+                <option value="12">12% (Réduit)</option>
+                <option value="6">6% (Super réduit)</option>
+                <option value="0">0% (Exonéré)</option>
+              </select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowQuickAddProduct(false)}>
+              Annuler
+            </Button>
+            <Button 
+              className="bg-brand-orange hover:bg-brand-orange/90"
+              onClick={handleQuickAddProduct}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Ajouter au panier
             </Button>
           </DialogFooter>
         </DialogContent>

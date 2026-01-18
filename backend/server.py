@@ -69,6 +69,7 @@ class StockMovementType(str, Enum):
     ADJUSTMENT = "adjustment"
     PURCHASE = "purchase"
     TRANSFER = "transfer"
+    DELIVERY = "delivery"  # For delivery notes
 
 class ShiftStatus(str, Enum):
     OPEN = "open"
@@ -235,6 +236,13 @@ class DocumentCreate(BaseModel):
     payment_terms: Optional[str] = None
     # For conversions
     source_document_id: Optional[str] = None
+    # Credit Note specific fields (Peppol compliant)
+    reference_invoice_id: Optional[str] = None  # Required for credit notes - links to original invoice
+    credit_reason: Optional[str] = None  # Reason: return, price_error, quantity_error, cancelled
+    # Delivery Note specific
+    delivery_address: Optional[str] = None
+    delivery_contact: Optional[str] = None
+    delivery_notes: Optional[str] = None
 
 class Document(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -263,6 +271,23 @@ class Document(BaseModel):
     created_by: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     updated_at: Optional[str] = None
+    
+    # Credit Note specific fields (Peppol BIS CreditNote compliant)
+    reference_invoice_id: Optional[str] = None  # Mandatory for credit notes
+    reference_invoice_number: Optional[str] = None  # Display number of original invoice
+    credit_reason: Optional[str] = None  # return, price_error, quantity_error, cancelled, other
+    
+    # Delivery Note specific fields
+    delivery_address: Optional[str] = None
+    delivery_contact: Optional[str] = None
+    delivery_notes: Optional[str] = None
+    delivered_at: Optional[str] = None
+    signed_by: Optional[str] = None
+    
+    # Stock movement tracking
+    stock_movement_created: bool = False
+    stock_movement_ids: List[str] = []
+    
     # Peppol fields
     peppol_status: Optional[str] = None  # pending, sent, delivered, failed
     peppol_id: Optional[str] = None
@@ -277,6 +302,7 @@ class Document(BaseModel):
 class ShiftCreate(BaseModel):
     opening_cash: float
     cashier_name: Optional[str] = None
+    register_number: int = 1  # Caisse 1 ou Caisse 2
 
 class CashMovement(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -343,6 +369,7 @@ class Shift(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     status: ShiftStatus = ShiftStatus.OPEN
+    register_number: int = 1  # Caisse 1 ou Caisse 2
     cashier_name: Optional[str] = None
     opening_cash: float = 0.0
     closing_cash: Optional[float] = None
@@ -501,6 +528,70 @@ class PeppyrusSettings(BaseModel):
     auto_send_invoices: bool = False  # Auto-send on invoice creation
     last_sync: Optional[str] = None
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+# Audit Log (for Peppol compliance and traceability)
+class AuditLogAction(str, Enum):
+    CREATE = "create"
+    UPDATE = "update"
+    DELETE = "delete"
+    CONVERT = "convert"  # Quote -> Invoice, etc.
+    SEND = "send"  # Peppol send
+    PAYMENT = "payment"
+    REFUND = "refund"
+    STOCK_MOVE = "stock_move"
+    STATUS_CHANGE = "status_change"
+
+class AuditLog(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    action: AuditLogAction
+    entity_type: str  # document, product, customer, payment, etc.
+    entity_id: str
+    entity_number: Optional[str] = None  # Document number for reference
+    description: str
+    user_id: Optional[str] = None
+    user_name: Optional[str] = None
+    old_values: Optional[Dict[str, Any]] = None  # For updates
+    new_values: Optional[Dict[str, Any]] = None  # For updates
+    metadata: Optional[Dict[str, Any]] = None  # Additional context
+    ip_address: Optional[str] = None
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+# Credit Note creation request
+class CreditNoteCreate(BaseModel):
+    reference_invoice_id: str  # Required - original invoice ID
+    items: List[DocumentItemCreate]  # Items to credit
+    credit_reason: str  # return, price_error, quantity_error, cancelled, other
+    notes: Optional[str] = None
+    restock_items: bool = True  # Whether to add items back to stock
+    refund_method: Optional[PaymentMethod] = None  # If immediate refund
+
+# ============= HELPERS =============
+async def log_audit(
+    action: AuditLogAction,
+    entity_type: str,
+    entity_id: str,
+    description: str,
+    entity_number: Optional[str] = None,
+    user_name: Optional[str] = None,
+    old_values: Optional[Dict] = None,
+    new_values: Optional[Dict] = None,
+    metadata: Optional[Dict] = None
+):
+    """Log an action for audit trail (Peppol compliance)"""
+    audit = AuditLog(
+        action=action,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        entity_number=entity_number,
+        description=description,
+        user_name=user_name,
+        old_values=old_values,
+        new_values=new_values,
+        metadata=metadata
+    )
+    await db.audit_logs.insert_one(audit.model_dump())
+    return audit
 
 # ============= HELPERS =============
 async def generate_document_number(doc_type: DocumentType) -> str:
@@ -1095,18 +1186,51 @@ async def create_document(doc_data: DocumentCreate):
         payment_terms=doc_data.payment_terms,
         source_document_id=doc_data.source_document_id,
         shift_id=shift_id,
-        peppol_recipient_id=peppol_recipient_id
+        peppol_recipient_id=peppol_recipient_id,
+        # Credit note fields if provided
+        reference_invoice_id=doc_data.reference_invoice_id,
+        credit_reason=doc_data.credit_reason,
+        # Delivery note fields if provided
+        delivery_address=doc_data.delivery_address,
+        delivery_contact=doc_data.delivery_contact,
+        delivery_notes=doc_data.delivery_notes
     )
     
     doc_dict = doc.model_dump()
     await db.documents.insert_one(doc_dict)
     
     # Update stock for invoices/receipts (not quotes)
+    stock_movement_ids = []
     if doc_data.doc_type in [DocumentType.INVOICE, DocumentType.RECEIPT]:
         for item in doc_data.items:
-            await record_stock_movement(
+            stock_move = await record_stock_movement(
                 item.product_id, item.sku, StockMovementType.SALE, 
                 item.qty, "document", doc.id
+            )
+            if stock_move and hasattr(stock_move, 'id'):
+                stock_movement_ids.append(stock_move.id)
+        
+        # Update document with stock movement IDs
+        if stock_movement_ids:
+            await db.documents.update_one(
+                {"id": doc.id},
+                {"$set": {"stock_movement_created": True, "stock_movement_ids": stock_movement_ids}}
+            )
+    
+    # Handle delivery note stock movements
+    if doc_data.doc_type == DocumentType.DELIVERY_NOTE:
+        for item in doc_data.items:
+            stock_move = await record_stock_movement(
+                item.product_id, item.sku, StockMovementType.DELIVERY,
+                item.qty, "delivery_note", doc.id
+            )
+            if stock_move and hasattr(stock_move, 'id'):
+                stock_movement_ids.append(stock_move.id)
+        
+        if stock_movement_ids:
+            await db.documents.update_one(
+                {"id": doc.id},
+                {"$set": {"stock_movement_created": True, "stock_movement_ids": stock_movement_ids}}
             )
     
     # Update shift totals if there's an active shift
@@ -1129,10 +1253,40 @@ async def create_document(doc_data: DocumentCreate):
     
     # Update source document if converting
     if doc_data.source_document_id:
+        old_status = (await db.documents.find_one({"id": doc_data.source_document_id}, {"status": 1})).get("status")
         await db.documents.update_one(
             {"id": doc_data.source_document_id},
             {"$push": {"related_documents": doc.id}, "$set": {"status": DocumentStatus.ACCEPTED}}
         )
+        # Log conversion audit
+        await log_audit(
+            action=AuditLogAction.CONVERT,
+            entity_type="document",
+            entity_id=doc_data.source_document_id,
+            description=f"Document converted to {doc_data.doc_type.value} ({doc.number})",
+            metadata={
+                "source_document_id": doc_data.source_document_id,
+                "target_document_id": doc.id,
+                "target_document_number": doc.number,
+                "target_type": doc_data.doc_type.value
+            }
+        )
+    
+    # Audit log for document creation
+    await log_audit(
+        action=AuditLogAction.CREATE,
+        entity_type="document",
+        entity_id=doc.id,
+        entity_number=doc.number,
+        description=f"{doc_data.doc_type.value.capitalize()} {doc.number} created",
+        metadata={
+            "doc_type": doc_data.doc_type.value,
+            "customer_id": doc_data.customer_id,
+            "customer_name": customer_name,
+            "total": total,
+            "items_count": len(doc_data.items)
+        }
+    )
     
     return doc
 
@@ -1255,17 +1409,32 @@ async def duplicate_document(doc_id: str):
     
     return await create_document(new_doc_data)
 
-# --- Returns / Credit Notes ---
+# --- Returns / Credit Notes (Peppol Compliant) ---
 @api_router.post("/returns")
 async def create_return(return_data: ReturnCreate):
-    """Process a return and create a credit note"""
+    """Process a return and create a Peppol-compliant credit note"""
     original_doc = await db.documents.find_one({"id": return_data.original_document_id}, {"_id": 0})
     if not original_doc:
         raise HTTPException(status_code=404, detail="Original document not found")
     
+    # Validate: Can only credit invoices and receipts
+    if original_doc["doc_type"] not in [DocumentType.INVOICE, DocumentType.RECEIPT]:
+        raise HTTPException(
+            status_code=400, 
+            detail="Credit notes can only be created for invoices or receipts"
+        )
+    
+    # Validate: Cannot credit an already credited document
+    if original_doc.get("status") == DocumentStatus.CREDITED:
+        raise HTTPException(
+            status_code=400,
+            detail="This document has already been credited"
+        )
+    
     # Create credit note items
     credit_items = []
     total_refund = 0.0
+    stock_movement_ids = []
     
     for item in return_data.items:
         line_subtotal = item.qty * item.unit_price
@@ -1283,46 +1452,166 @@ async def create_return(return_data: ReturnCreate):
         ))
         
         # Restore stock
-        await record_stock_movement(
+        stock_move = await record_stock_movement(
             item.product_id, item.sku, StockMovementType.RETURN,
             item.qty, "return", return_data.original_document_id, item.reason
         )
+        if stock_move and hasattr(stock_move, 'id'):
+            stock_movement_ids.append(stock_move.id)
     
-    # Create credit note
-    credit_note_data = DocumentCreate(
+    # Generate credit note number
+    credit_note_number = await generate_document_number(DocumentType.CREDIT_NOTE)
+    
+    # Calculate totals for credit note
+    items, subtotal, vat_total, total = calculate_document_totals(credit_items, None, 0)
+    
+    # Get current shift
+    shift = await get_current_shift()
+    shift_id = shift.get("id") if shift else None
+    
+    # Create Peppol-compliant credit note with proper references
+    credit_note = Document(
+        number=credit_note_number,
         doc_type=DocumentType.CREDIT_NOTE,
+        status=DocumentStatus.UNPAID,  # Credit notes start as unpaid
         customer_id=original_doc.get("customer_id"),
-        items=credit_items,
-        payments=[PaymentCreate(method=return_data.refund_method or PaymentMethod.CASH, amount=-total_refund)] if return_data.refund_method else [],
+        customer_name=original_doc.get("customer_name"),
+        customer_vat=original_doc.get("customer_vat"),
+        customer_address=original_doc.get("customer_address"),
+        items=[i.model_dump() for i in items],
+        payments=[],
+        subtotal=subtotal,
+        vat_total=vat_total,
+        total=total,  # Will be negative
+        paid_total=0,
         notes=return_data.notes,
-        source_document_id=return_data.original_document_id
+        source_document_id=return_data.original_document_id,
+        # Peppol-required reference fields
+        reference_invoice_id=return_data.original_document_id,
+        reference_invoice_number=original_doc.get("number"),
+        credit_reason=return_data.items[0].reason if return_data.items else "return",
+        # Stock tracking
+        stock_movement_created=len(stock_movement_ids) > 0,
+        stock_movement_ids=stock_movement_ids,
+        shift_id=shift_id,
+        peppol_recipient_id=original_doc.get("peppol_recipient_id")
     )
     
-    credit_note = await create_document(credit_note_data)
+    credit_note_dict = credit_note.model_dump()
+    await db.documents.insert_one(credit_note_dict)
+    
+    # Process refund payment if specified
+    if return_data.refund_method:
+        refund_payment = Payment(
+            method=return_data.refund_method,
+            amount=-total_refund,  # Negative for refund
+            document_id=credit_note.id,
+            shift_id=shift_id
+        )
+        await db.documents.update_one(
+            {"id": credit_note.id},
+            {
+                "$push": {"payments": refund_payment.model_dump()},
+                "$set": {
+                    "paid_total": round(-total_refund, 2),
+                    "status": DocumentStatus.PAID,
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }
+            }
+        )
     
     # Update original document
     await db.documents.update_one(
         {"id": return_data.original_document_id},
-        {"$set": {"status": DocumentStatus.CREDITED}, "$push": {"related_documents": credit_note.id}}
+        {
+            "$set": {"status": DocumentStatus.CREDITED, "updated_at": datetime.now(timezone.utc).isoformat()}, 
+            "$push": {"related_documents": credit_note.id}
+        }
     )
     
     # Update shift refunds
-    shift = await get_current_shift()
     if shift:
-        await db.shifts.update_one({"id": shift["id"]}, {"$inc": {"refunds_total": total_refund}})
+        refund_inc = {"refunds_total": total_refund}
+        if return_data.refund_method == PaymentMethod.CASH:
+            refund_inc["cash_total"] = -total_refund
+        elif return_data.refund_method == PaymentMethod.CARD:
+            refund_inc["card_total"] = -total_refund
+        await db.shifts.update_one({"id": shift["id"]}, {"$inc": refund_inc})
     
-    return credit_note
+    # Audit log for Peppol compliance
+    await log_audit(
+        action=AuditLogAction.CREATE,
+        entity_type="credit_note",
+        entity_id=credit_note.id,
+        entity_number=credit_note.number,
+        description=f"Credit note {credit_note.number} created for invoice {original_doc.get('number')}",
+        metadata={
+            "original_invoice_id": return_data.original_document_id,
+            "original_invoice_number": original_doc.get("number"),
+            "credit_reason": return_data.items[0].reason if return_data.items else "return",
+            "total_refund": total_refund,
+            "items_count": len(credit_items),
+            "refund_method": return_data.refund_method.value if return_data.refund_method else None
+        }
+    )
+    
+    return await db.documents.find_one({"id": credit_note.id}, {"_id": 0})
+
+@api_router.post("/documents/{doc_id}/credit-note")
+async def create_credit_note_from_invoice(doc_id: str, credit_data: CreditNoteCreate):
+    """Create a credit note from an existing invoice (Peppol compliant)"""
+    # Get original invoice
+    original_doc = await db.documents.find_one({"id": doc_id}, {"_id": 0})
+    if not original_doc:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    # Validate document type
+    if original_doc["doc_type"] not in [DocumentType.INVOICE, DocumentType.RECEIPT]:
+        raise HTTPException(
+            status_code=400,
+            detail="Credit notes can only be created for invoices or receipts"
+        )
+    
+    # Validate status
+    if original_doc.get("status") == DocumentStatus.CREDITED:
+        raise HTTPException(
+            status_code=400,
+            detail="This document has already been fully credited"
+        )
+    
+    # Convert credit items to return items for processing
+    return_items = []
+    for item in credit_data.items:
+        return_items.append(ReturnItemCreate(
+            product_id=item.product_id,
+            sku=item.sku,
+            name=item.name,
+            qty=item.qty,
+            unit_price=item.unit_price,
+            vat_rate=item.vat_rate,
+            reason=credit_data.credit_reason
+        ))
+    
+    return_data = ReturnCreate(
+        original_document_id=doc_id,
+        items=return_items,
+        notes=credit_data.notes,
+        refund_method=credit_data.refund_method
+    )
+    
+    return await create_return(return_data)
 
 # --- Shifts ---
 @api_router.post("/shifts/open", response_model=Shift)
 async def open_shift(data: ShiftCreate):
-    existing = await db.shifts.find_one({"status": ShiftStatus.OPEN})
+    existing = await db.shifts.find_one({"status": ShiftStatus.OPEN, "register_number": data.register_number})
     if existing:
-        raise HTTPException(status_code=400, detail="A shift is already open")
+        raise HTTPException(status_code=400, detail=f"Caisse {data.register_number} est déjà ouverte")
     
     shift = Shift(
         opening_cash=data.opening_cash,
         cashier_name=data.cashier_name,
+        register_number=data.register_number,
         cash_movements=[CashMovement(type=CashMovementType.CASH_IN, amount=data.opening_cash, reason="Opening cash").model_dump()]
     )
     
@@ -1742,23 +2031,36 @@ async def test_peppyrus_connection():
     import requests
     
     settings = await db.peppyrus_settings.find_one({}, {"_id": 0})
-    if not settings or not settings.get("api_key"):
-        raise HTTPException(status_code=400, detail="Peppyrus not configured")
+    if not settings:
+        raise HTTPException(status_code=400, detail="Peppyrus pas encore configuré. Veuillez d'abord sauvegarder vos paramètres API.")
+    if not settings.get("api_key"):
+        raise HTTPException(status_code=400, detail="Clé API Peppyrus manquante")
+    if not settings.get("api_url"):
+        raise HTTPException(status_code=400, detail="URL API Peppyrus manquante")
     
     try:
         # Test API connection
+        api_url = settings['api_url'].rstrip('/')
         response = requests.get(
-            f"{settings['api_url']}/api/v1/status",
+            f"{api_url}/api/v1/status",
             headers={"Authorization": f"Bearer {settings['api_key']}"},
             timeout=10
         )
         
         if response.status_code == 200:
             return {"status": "connected", "message": "Connexion Peppyrus réussie"}
+        elif response.status_code == 401:
+            return {"status": "error", "message": "Clé API invalide ou expirée"}
+        elif response.status_code == 403:
+            return {"status": "error", "message": "Accès refusé - vérifiez vos permissions"}
         else:
-            return {"status": "error", "message": f"Erreur API: {response.status_code}"}
+            return {"status": "error", "message": f"Erreur API: {response.status_code} - {response.text[:100]}"}
+    except requests.exceptions.Timeout:
+        return {"status": "error", "message": "Timeout - le serveur Peppyrus ne répond pas"}
+    except requests.exceptions.ConnectionError:
+        return {"status": "error", "message": "Impossible de se connecter au serveur Peppyrus"}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return {"status": "error", "message": f"Erreur: {str(e)}"}
 
 @api_router.post("/documents/{document_id}/send-peppol")
 async def send_document_to_peppol(document_id: str):
@@ -1834,6 +2136,21 @@ async def send_document_to_peppol(document_id: str):
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }}
             )
+            
+            # Audit log for Peppol send
+            await log_audit(
+                action=AuditLogAction.SEND,
+                entity_type="document",
+                entity_id=document_id,
+                entity_number=doc.get("number"),
+                description=f"Document {doc.get('number')} sent via Peppol",
+                metadata={
+                    "peppol_message_id": peppol_message_id,
+                    "peppol_recipient_id": peppol_recipient,
+                    "doc_type": doc.get("doc_type")
+                }
+            )
+            
             return {
                 "status": "success", 
                 "peppol_message_id": peppol_message_id,
@@ -1848,6 +2165,21 @@ async def send_document_to_peppol(document_id: str):
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }}
             )
+            
+            # Audit log for failed Peppol send
+            await log_audit(
+                action=AuditLogAction.SEND,
+                entity_type="document",
+                entity_id=document_id,
+                entity_number=doc.get("number"),
+                description=f"Peppol send failed for {doc.get('number')}",
+                metadata={
+                    "error_code": response.status_code,
+                    "error_message": response.text[:200],
+                    "doc_type": doc.get("doc_type")
+                }
+            )
+            
             raise HTTPException(status_code=500, detail=f"Peppol sending failed: {response.text}")
     
     except requests.RequestException as e:
@@ -2057,6 +2389,113 @@ def generate_ubl_invoice(doc: dict, company: dict, customer: dict) -> str:
     # Pretty print
     parsed = minidom.parseString(xml_str)
     return parsed.toprettyxml(indent="  ")
+
+# --- Audit Log Endpoints (Peppol Compliance) ---
+@api_router.get("/audit-logs")
+async def get_audit_logs(
+    entity_type: Optional[str] = Query(None),
+    entity_id: Optional[str] = Query(None),
+    action: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    limit: int = Query(100, le=500)
+):
+    """Get audit logs for Peppol compliance and traceability"""
+    query = {}
+    
+    if entity_type:
+        query["entity_type"] = entity_type
+    if entity_id:
+        query["entity_id"] = entity_id
+    if action:
+        query["action"] = action
+    if date_from:
+        query["created_at"] = {"$gte": date_from}
+    if date_to:
+        query.setdefault("created_at", {})["$lte"] = date_to
+    
+    logs = await db.audit_logs.find(query, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    return logs
+
+@api_router.get("/audit-logs/document/{doc_id}")
+async def get_document_audit_trail(doc_id: str):
+    """Get complete audit trail for a document (Peppol requirement)"""
+    # Get the document
+    doc = await db.documents.find_one({"id": doc_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    # Get all audit logs for this document
+    logs = await db.audit_logs.find(
+        {"entity_id": doc_id},
+        {"_id": 0}
+    ).sort("created_at", 1).to_list(100)
+    
+    # Also get logs for related documents
+    related_doc_ids = doc.get("related_documents", [])
+    if doc.get("source_document_id"):
+        related_doc_ids.append(doc.get("source_document_id"))
+    if doc.get("reference_invoice_id"):
+        related_doc_ids.append(doc.get("reference_invoice_id"))
+    
+    related_logs = []
+    if related_doc_ids:
+        related_logs = await db.audit_logs.find(
+            {"entity_id": {"$in": related_doc_ids}},
+            {"_id": 0}
+        ).sort("created_at", 1).to_list(100)
+    
+    return {
+        "document": doc,
+        "audit_trail": logs,
+        "related_document_logs": related_logs,
+        "total_entries": len(logs) + len(related_logs)
+    }
+
+@api_router.get("/audit-logs/summary")
+async def get_audit_summary(
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None)
+):
+    """Get audit log summary statistics"""
+    query = {}
+    if date_from:
+        query["created_at"] = {"$gte": date_from}
+    if date_to:
+        query.setdefault("created_at", {})["$lte": date_to]
+    
+    # Get counts by action type
+    pipeline = [
+        {"$match": query} if query else {"$match": {}},
+        {"$group": {
+            "_id": {"action": "$action", "entity_type": "$entity_type"},
+            "count": {"$sum": 1}
+        }},
+        {"$sort": {"count": -1}}
+    ]
+    
+    results = await db.audit_logs.aggregate(pipeline).to_list(100)
+    
+    # Format results
+    by_action = {}
+    by_entity = {}
+    
+    for r in results:
+        action = r["_id"]["action"]
+        entity = r["_id"]["entity_type"]
+        count = r["count"]
+        
+        by_action[action] = by_action.get(action, 0) + count
+        by_entity[entity] = by_entity.get(entity, 0) + count
+    
+    total = await db.audit_logs.count_documents(query) if query else await db.audit_logs.count_documents({})
+    
+    return {
+        "total_entries": total,
+        "by_action": by_action,
+        "by_entity_type": by_entity,
+        "detailed": results
+    }
 
 # --- Shopify Integration Endpoints ---
 @api_router.get("/shopify/settings")
@@ -2599,6 +3038,156 @@ async def sync_shopify_orders():
     )
     
     return {"status": "success", "message": "Order sync placeholder executed"}
+
+# ============= REPORTS API =============
+@api_router.get("/reports/dashboard")
+async def get_reports_dashboard(date_from: Optional[str] = None, date_to: Optional[str] = None):
+    """Get dashboard statistics for reports"""
+    # Build date query
+    date_query = {}
+    if date_from:
+        date_query["$gte"] = date_from
+    if date_to:
+        date_query["$lte"] = date_to + "T23:59:59"
+    
+    query = {}
+    if date_query:
+        query["created_at"] = date_query
+    
+    # Get documents for period
+    docs = await db.documents.find(
+        {**query, "doc_type": {"$in": ["invoice", "receipt"]}},
+        {"_id": 0}
+    ).to_list(10000)
+    
+    # Calculate totals
+    total_sales = sum(d.get("total", 0) for d in docs if d.get("status") in ["paid", "partially_paid"])
+    transactions_count = len(docs)
+    products_sold = sum(sum(item.get("qty", 0) for item in d.get("items", [])) for d in docs)
+    
+    # Get unique customers
+    customer_ids = set(d.get("customer_id") for d in docs if d.get("customer_id"))
+    active_customers = len(customer_ids)
+    
+    # Calculate previous period for comparison
+    # (simplified - just show zeros for now if no comparison data)
+    
+    # Top products
+    product_counts = {}
+    for doc in docs:
+        for item in doc.get("items", []):
+            pid = item.get("product_id", item.get("sku"))
+            if pid:
+                if pid not in product_counts:
+                    product_counts[pid] = {"name": item.get("name"), "qty": 0, "revenue": 0}
+                product_counts[pid]["qty"] += item.get("qty", 0)
+                product_counts[pid]["revenue"] += item.get("line_subtotal", item.get("qty", 0) * item.get("unit_price", 0))
+    
+    top_products = sorted(product_counts.values(), key=lambda x: x["revenue"], reverse=True)[:10]
+    
+    # Sales by payment method
+    payment_methods = {"cash": 0, "card": 0, "bank_transfer": 0}
+    for doc in docs:
+        for payment in doc.get("payments", []):
+            method = payment.get("method", "cash")
+            payment_methods[method] = payment_methods.get(method, 0) + payment.get("amount", 0)
+    
+    # Daily sales trend
+    daily_sales = {}
+    for doc in docs:
+        date = doc.get("created_at", "")[:10]
+        if date:
+            if date not in daily_sales:
+                daily_sales[date] = {"date": date, "total": 0, "count": 0}
+            daily_sales[date]["total"] += doc.get("total", 0)
+            daily_sales[date]["count"] += 1
+    
+    daily_trend = sorted(daily_sales.values(), key=lambda x: x["date"])
+    
+    # VAT breakdown
+    vat_breakdown = {}
+    for doc in docs:
+        for item in doc.get("items", []):
+            rate = str(int(item.get("vat_rate", 21)))
+            if rate not in vat_breakdown:
+                vat_breakdown[rate] = {"rate": rate, "base": 0, "vat": 0}
+            vat_breakdown[rate]["base"] += item.get("line_subtotal", 0)
+            vat_breakdown[rate]["vat"] += item.get("line_vat", 0)
+    
+    return {
+        "summary": {
+            "total_sales": round(total_sales, 2),
+            "transactions_count": transactions_count,
+            "products_sold": int(products_sold),
+            "active_customers": active_customers,
+            "average_ticket": round(total_sales / transactions_count, 2) if transactions_count > 0 else 0
+        },
+        "top_products": top_products,
+        "payment_methods": payment_methods,
+        "daily_trend": daily_trend,
+        "vat_breakdown": list(vat_breakdown.values())
+    }
+
+@api_router.get("/reports/vat")
+async def get_vat_report(date_from: Optional[str] = None, date_to: Optional[str] = None):
+    """Get VAT report for accounting"""
+    date_query = {}
+    if date_from:
+        date_query["$gte"] = date_from
+    if date_to:
+        date_query["$lte"] = date_to + "T23:59:59"
+    
+    query = {"doc_type": {"$in": ["invoice", "receipt"]}}
+    if date_query:
+        query["created_at"] = date_query
+    
+    docs = await db.documents.find(query, {"_id": 0}).to_list(10000)
+    
+    vat_breakdown = {}
+    for doc in docs:
+        for item in doc.get("items", []):
+            rate = str(int(item.get("vat_rate", 21)))
+            if rate not in vat_breakdown:
+                vat_breakdown[rate] = {"rate": int(rate), "base": 0, "vat": 0, "total": 0}
+            vat_breakdown[rate]["base"] += item.get("line_subtotal", 0)
+            vat_breakdown[rate]["vat"] += item.get("line_vat", 0)
+            vat_breakdown[rate]["total"] += item.get("line_total", 0)
+    
+    totals = {
+        "base": sum(v["base"] for v in vat_breakdown.values()),
+        "vat": sum(v["vat"] for v in vat_breakdown.values()),
+        "total": sum(v["total"] for v in vat_breakdown.values())
+    }
+    
+    return {
+        "period": {"from": date_from, "to": date_to},
+        "breakdown": list(vat_breakdown.values()),
+        "totals": {k: round(v, 2) for k, v in totals.items()},
+        "documents_count": len(docs)
+    }
+
+@api_router.get("/reports/inventory")
+async def get_inventory_report():
+    """Get current inventory status"""
+    products = await db.products.find({}, {"_id": 0}).to_list(10000)
+    
+    total_value = sum(p.get("stock_qty", 0) * p.get("price_retail", 0) for p in products)
+    total_items = sum(p.get("stock_qty", 0) for p in products)
+    
+    low_stock = [p for p in products if p.get("stock_qty", 0) <= p.get("min_stock", 0)]
+    out_of_stock = [p for p in products if p.get("stock_qty", 0) == 0]
+    
+    return {
+        "summary": {
+            "total_products": len(products),
+            "total_items": total_items,
+            "total_value": round(total_value, 2),
+            "low_stock_count": len(low_stock),
+            "out_of_stock_count": len(out_of_stock)
+        },
+        "low_stock": low_stock[:20],
+        "out_of_stock": out_of_stock[:20]
+    }
 
 @api_router.get("/shopify/sync-logs")
 async def get_shopify_sync_logs(limit: int = Query(50)):

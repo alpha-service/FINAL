@@ -35,12 +35,20 @@ export default function CashRegister() {
   const [showZReportDialog, setShowZReportDialog] = useState(false);
   const [openingCash, setOpeningCash] = useState("");
   const [cashierName, setCashierName] = useState("");
+  const [registerNumber, setRegisterNumber] = useState(() => {
+    return parseInt(localStorage.getItem('selected_register') || '1');
+  });
   const [countedCash, setCountedCash] = useState("");
   const [closeNotes, setCloseNotes] = useState("");
   const [movementType, setMovementType] = useState("cash_in");
   const [movementAmount, setMovementAmount] = useState("");
   const [movementReason, setMovementReason] = useState("");
   const [zReport, setZReport] = useState(null);
+
+  // Persist register selection
+  useEffect(() => {
+    localStorage.setItem('selected_register', registerNumber.toString());
+  }, [registerNumber]);
 
   useEffect(() => {
     fetchData();
@@ -86,9 +94,10 @@ export default function CashRegister() {
     try {
       await axios.post(`${API}/shifts/open`, {
         opening_cash: amount,
-        cashier_name: cashierName || "Caissier"
+        cashier_name: cashierName || "Caissier",
+        register_number: registerNumber
       });
-      toast.success("Caisse ouverte");
+      toast.success(`Caisse ${registerNumber} ouverte`);
       setShowOpenDialog(false);
       setOpeningCash("");
       setCashierName("");
@@ -214,7 +223,7 @@ export default function CashRegister() {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-              <h2 className="text-lg font-bold">Caisse ouverte</h2>
+              <h2 className="text-lg font-bold">Caisse {currentShift.register_number || 1} ouverte</h2>
               <Badge className="bg-green-100 text-green-800">
                 {currentShift.cashier_name || "Caissier"}
               </Badge>
@@ -382,10 +391,22 @@ export default function CashRegister() {
           <DialogHeader>
             <DialogTitle>Ouvrir la caisse</DialogTitle>
             <DialogDescription>
-              Entrez le montant du fond de caisse
+              Sélectionnez la caisse et entrez le montant du fond de caisse
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Numéro de caisse</label>
+              <Select value={registerNumber.toString()} onValueChange={(v) => setRegisterNumber(parseInt(v))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner une caisse" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Caisse 1</SelectItem>
+                  <SelectItem value="2">Caisse 2</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <label className="text-sm font-medium mb-2 block">Nom du caissier</label>
               <Input
@@ -412,7 +433,7 @@ export default function CashRegister() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowOpenDialog(false)}>Annuler</Button>
             <Button className="bg-green-600 hover:bg-green-700" onClick={handleOpenShift}>
-              Ouvrir la caisse
+              Ouvrir Caisse {registerNumber}
             </Button>
           </DialogFooter>
         </DialogContent>

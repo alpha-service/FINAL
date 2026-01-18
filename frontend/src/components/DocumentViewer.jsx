@@ -245,10 +245,14 @@ export default function DocumentViewer({ document }) {
                   <th className="border border-slate-300 p-2 text-left font-semibold">REF / ART</th>
                   <th className="border border-slate-300 p-2 text-left font-semibold">DESCRIPTION</th>
                   <th className="border border-slate-300 p-2 text-center font-semibold">QUANTITÉ</th>
-                  <th className="border border-slate-300 p-2 text-right font-semibold">PRIX UNIT.</th>
-                  <th className="border border-slate-300 p-2 text-right font-semibold">REMISE</th>
-                  <th className="border border-slate-300 p-2 text-center font-semibold">TVA %</th>
-                  <th className="border border-slate-300 p-2 text-right font-semibold">TOTAL TTC</th>
+                  {document.doc_type !== 'delivery_note' && (
+                    <>
+                      <th className="border border-slate-300 p-2 text-right font-semibold">PRIX UNIT.</th>
+                      <th className="border border-slate-300 p-2 text-right font-semibold">REMISE</th>
+                      <th className="border border-slate-300 p-2 text-center font-semibold">TVA %</th>
+                      <th className="border border-slate-300 p-2 text-right font-semibold">TOTAL TTC</th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -257,71 +261,77 @@ export default function DocumentViewer({ document }) {
                     <td className="border border-slate-300 p-2 font-mono text-xs">{item.sku}</td>
                     <td className="border border-slate-300 p-2">{item.name}</td>
                     <td className="border border-slate-300 p-2 text-center">{item.qty}</td>
-                    <td className="border border-slate-300 p-2 text-right font-mono">
-                      €{Math.abs(item.unit_price).toFixed(2)}
-                    </td>
-                    <td className="border border-slate-300 p-2 text-right">
-                      {item.discount_value > 0 ? (
-                        item.discount_type === 'percent' 
-                          ? `${item.discount_value}%` 
-                          : `€${item.discount_value.toFixed(2)}`
-                      ) : '—'}
-                    </td>
-                    <td className="border border-slate-300 p-2 text-center">{item.vat_rate}%</td>
-                    <td className="border border-slate-300 p-2 text-right font-semibold font-mono">
-                      €{Math.abs(item.line_total).toFixed(2)}
-                    </td>
+                    {document.doc_type !== 'delivery_note' && (
+                      <>
+                        <td className="border border-slate-300 p-2 text-right font-mono">
+                          €{Math.abs(item.unit_price).toFixed(2)}
+                        </td>
+                        <td className="border border-slate-300 p-2 text-right">
+                          {item.discount_value > 0 ? (
+                            item.discount_type === 'percent' 
+                              ? `${item.discount_value}%` 
+                              : `€${item.discount_value.toFixed(2)}`
+                          ) : '—'}
+                        </td>
+                        <td className="border border-slate-300 p-2 text-center">{item.vat_rate}%</td>
+                        <td className="border border-slate-300 p-2 text-right font-semibold font-mono">
+                          €{Math.abs(item.line_total).toFixed(2)}
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          {/* Totals Area (Bottom Right) */}
-          <div className="flex justify-end mb-8">
-            <div style={{ width: '320px' }}>
-              <table className="w-full border border-slate-300" style={{ fontSize: '11px' }}>
-                <tbody>
-                  <tr className="bg-slate-50">
-                    <td className="border-r border-slate-300 p-2 font-semibold">Total HT / Totaal excl. BTW</td>
-                    <td className="p-2 text-right font-mono">€{totalHT.toFixed(2)}</td>
-                  </tr>
-                  {Object.entries(vatBreakdown).map(([rate, amounts]) => (
-                    <tr key={rate} className="bg-white">
-                      <td className="border-r border-slate-300 p-2">TVA / BTW {rate}%</td>
-                      <td className="p-2 text-right font-mono">€{amounts.vat.toFixed(2)}</td>
+          {/* Totals Area (Bottom Right) - Hidden for delivery notes */}
+          {document.doc_type !== 'delivery_note' && (
+            <div className="flex justify-end mb-8">
+              <div style={{ width: '320px' }}>
+                <table className="w-full border border-slate-300" style={{ fontSize: '11px' }}>
+                  <tbody>
+                    <tr className="bg-slate-50">
+                      <td className="border-r border-slate-300 p-2 font-semibold">Total HT / Totaal excl. BTW</td>
+                      <td className="p-2 text-right font-mono">€{totalHT.toFixed(2)}</td>
                     </tr>
-                  ))}
-                  <tr className="bg-brand-navy text-white">
-                    <td className="border-r border-white p-3 font-bold text-sm">Total TTC / Totaal incl. BTW</td>
-                    <td className="p-3 text-right font-mono font-bold text-lg">
-                      €{(document.total || 0).toFixed(2)}
-                    </td>
-                  </tr>
-                  {document.paid_total > 0 && (
-                    <>
-                      <tr className="bg-green-50">
-                        <td className="border-r border-slate-300 p-2 text-green-700">Payé / Betaald</td>
-                        <td className="p-2 text-right font-mono text-green-700">
-                          €{(document.paid_total || 0).toFixed(2)}
-                        </td>
+                    {Object.entries(vatBreakdown).map(([rate, amounts]) => (
+                      <tr key={rate} className="bg-white">
+                        <td className="border-r border-slate-300 p-2">TVA / BTW {rate}%</td>
+                        <td className="p-2 text-right font-mono">€{amounts.vat.toFixed(2)}</td>
                       </tr>
-                      {(document.total - document.paid_total) > 0.01 && (
-                        <tr className="bg-amber-50">
-                          <td className="border-r border-slate-300 p-2 font-semibold text-amber-700">
-                            Reste à payer / Rest te betalen
-                          </td>
-                          <td className="p-2 text-right font-mono font-semibold text-amber-700">
-                            €{((document.total || 0) - (document.paid_total || 0)).toFixed(2)}
+                    ))}
+                    <tr className="bg-brand-navy text-white">
+                      <td className="border-r border-white p-3 font-bold text-sm">Total TTC / Totaal incl. BTW</td>
+                      <td className="p-3 text-right font-mono font-bold text-lg">
+                        €{(document.total || 0).toFixed(2)}
+                      </td>
+                    </tr>
+                    {document.paid_total > 0 && (
+                      <>
+                        <tr className="bg-green-50">
+                          <td className="border-r border-slate-300 p-2 text-green-700">Payé / Betaald</td>
+                          <td className="p-2 text-right font-mono text-green-700">
+                            €{(document.paid_total || 0).toFixed(2)}
                           </td>
                         </tr>
-                      )}
-                    </>
-                  )}
-                </tbody>
-              </table>
+                        {(document.total - document.paid_total) > 0.01 && (
+                          <tr className="bg-amber-50">
+                            <td className="border-r border-slate-300 p-2 font-semibold text-amber-700">
+                              Reste à payer / Rest te betalen
+                            </td>
+                            <td className="p-2 text-right font-mono font-semibold text-amber-700">
+                              €{((document.total || 0) - (document.paid_total || 0)).toFixed(2)}
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Payment History */}
           {document.payments?.length > 0 && (

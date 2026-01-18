@@ -18,7 +18,8 @@ import {
   Save,
   CreditCard,
   FileText,
-  Send
+  Send,
+  Palette
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,12 +28,15 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { useDesign, DESIGNS, DESIGN_CONFIG } from "@/hooks/useDesign";
+import { cn } from "@/lib/utils";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function Settings() {
   const [printerEnabled, setPrinterEnabled] = useState(false);
   const [scannerEnabled, setScannerEnabled] = useState(true);
+  const { currentDesign, setCurrentDesign, design } = useDesign();
   
   // Company Settings
   const [companySettings, setCompanySettings] = useState({
@@ -139,11 +143,12 @@ export default function Settings() {
       if (response.data.status === "connected") {
         toast.success("Connexion Peppol réussie!");
       } else {
-        toast.error(response.data.message);
+        toast.error(response.data.message || "Erreur de connexion");
       }
     } catch (error) {
-      setPeppolTestResult({ status: "error", message: "Erreur de connexion" });
-      toast.error("Erreur lors du test");
+      const errorMsg = error.response?.data?.detail || error.message || "Erreur de connexion";
+      setPeppolTestResult({ status: "error", message: errorMsg });
+      toast.error(errorMsg);
     }
   };
 
@@ -250,7 +255,7 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="company" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
+        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-flex">
           <TabsTrigger value="company" className="flex items-center gap-2">
             <Building2 className="w-4 h-4" />
             <span className="hidden sm:inline">Entreprise</span>
@@ -262,6 +267,10 @@ export default function Settings() {
           <TabsTrigger value="shopify" className="flex items-center gap-2">
             <ShoppingBag className="w-4 h-4" />
             <span className="hidden sm:inline">Shopify</span>
+          </TabsTrigger>
+          <TabsTrigger value="appearance" className="flex items-center gap-2">
+            <Palette className="w-4 h-4" />
+            <span className="hidden sm:inline">Apparence</span>
           </TabsTrigger>
           <TabsTrigger value="hardware" className="flex items-center gap-2">
             <Printer className="w-4 h-4" />
@@ -841,6 +850,178 @@ export default function Settings() {
             </div>
           )}
         </div>
+          </div>
+        </TabsContent>
+
+        {/* Appearance Tab */}
+        <TabsContent value="appearance">
+          <div className="grid grid-cols-1 gap-6">
+            {/* Design Mode Selection */}
+            <div className="bg-white rounded-lg border border-slate-200 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Palette className="w-5 h-5 text-brand-navy" />
+                <div>
+                  <h2 className="font-heading font-bold">Mode d'affichage / Weergavemodus</h2>
+                  <p className="text-sm text-muted-foreground">Changez l'apparence complète du POS</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Classic Design */}
+                <button
+                  onClick={() => setCurrentDesign(DESIGNS.CLASSIC)}
+                  className={cn(
+                    "relative p-4 rounded-xl border-2 transition-all text-left",
+                    currentDesign === DESIGNS.CLASSIC 
+                      ? "border-brand-orange bg-brand-orange/5 ring-2 ring-brand-orange/20" 
+                      : "border-slate-200 hover:border-slate-300"
+                  )}
+                >
+                  {currentDesign === DESIGNS.CLASSIC && (
+                    <CheckCircle className="absolute top-3 right-3 w-5 h-5 text-brand-orange" />
+                  )}
+                  <div className="flex gap-2 mb-3">
+                    <div className="w-4 h-4 rounded bg-[#1a365d]" />
+                    <div className="w-4 h-4 rounded bg-[#e67e22]" />
+                    <div className="w-4 h-4 rounded bg-slate-100" />
+                  </div>
+                  <h3 className="font-bold text-brand-navy mb-1">{DESIGN_CONFIG[DESIGNS.CLASSIC].name}</h3>
+                  <p className="text-xs text-muted-foreground">{DESIGN_CONFIG[DESIGNS.CLASSIC].description}</p>
+                  <div className="mt-3 text-xs space-y-1 text-muted-foreground">
+                    <div>✓ Interface traditionnelle</div>
+                    <div>✓ Couleurs de marque ALPHA&CO</div>
+                    <div>✓ Familier et professionnel</div>
+                  </div>
+                </button>
+
+                {/* Modern Design */}
+                <button
+                  onClick={() => setCurrentDesign(DESIGNS.MODERN)}
+                  className={cn(
+                    "relative p-4 rounded-xl border-2 transition-all text-left",
+                    currentDesign === DESIGNS.MODERN 
+                      ? "border-purple-500 bg-purple-50 ring-2 ring-purple-500/20" 
+                      : "border-slate-200 hover:border-slate-300"
+                  )}
+                >
+                  {currentDesign === DESIGNS.MODERN && (
+                    <CheckCircle className="absolute top-3 right-3 w-5 h-5 text-purple-600" />
+                  )}
+                  <div className="flex gap-2 mb-3">
+                    <div className="w-4 h-4 rounded-full bg-gradient-to-br from-purple-500 to-pink-500" />
+                    <div className="w-4 h-4 rounded-full bg-slate-800" />
+                    <div className="w-4 h-4 rounded-full bg-purple-100" />
+                  </div>
+                  <h3 className="font-bold text-purple-900 mb-1">{DESIGN_CONFIG[DESIGNS.MODERN].name}</h3>
+                  <p className="text-xs text-muted-foreground">{DESIGN_CONFIG[DESIGNS.MODERN].description}</p>
+                  <div className="mt-3 text-xs space-y-1 text-muted-foreground">
+                    <div>✓ Style glassmorphisme</div>
+                    <div>✓ Dégradés et ombres élégantes</div>
+                    <div>✓ Animations fluides</div>
+                  </div>
+                </button>
+
+                {/* Minimal Design */}
+                <button
+                  onClick={() => setCurrentDesign(DESIGNS.MINIMAL)}
+                  className={cn(
+                    "relative p-4 rounded-xl border-2 transition-all text-left",
+                    currentDesign === DESIGNS.MINIMAL 
+                      ? "border-black bg-neutral-50 ring-2 ring-black/10" 
+                      : "border-slate-200 hover:border-slate-300"
+                  )}
+                >
+                  {currentDesign === DESIGNS.MINIMAL && (
+                    <CheckCircle className="absolute top-3 right-3 w-5 h-5 text-black" />
+                  )}
+                  <div className="flex gap-2 mb-3">
+                    <div className="w-4 h-4 bg-black" />
+                    <div className="w-4 h-4 bg-neutral-500" />
+                    <div className="w-4 h-4 bg-neutral-200" />
+                  </div>
+                  <h3 className="font-bold text-black mb-1">{DESIGN_CONFIG[DESIGNS.MINIMAL].name}</h3>
+                  <p className="text-xs text-muted-foreground">{DESIGN_CONFIG[DESIGNS.MINIMAL].description}</p>
+                  <div className="mt-3 text-xs space-y-1 text-muted-foreground">
+                    <div>✓ Design épuré et monochrome</div>
+                    <div>✓ Angles droits, sans fioritures</div>
+                    <div>✓ Concentration maximale</div>
+                  </div>
+                </button>
+              </div>
+
+              <div className="mt-6 p-4 bg-slate-50 rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  <strong>Note:</strong> Le changement de design s'applique immédiatement à toutes les pages.
+                  Votre préférence est sauvegardée automatiquement.
+                </p>
+              </div>
+            </div>
+
+            {/* Preview Section */}
+            <div className="bg-white rounded-lg border border-slate-200 p-6">
+              <h3 className="font-heading font-bold mb-4">Aperçu du design actuel</h3>
+              <div className={cn(
+                "p-6 rounded-xl",
+                currentDesign === DESIGNS.MODERN 
+                  ? "bg-gradient-to-br from-slate-100 via-purple-50 to-slate-100" 
+                  : currentDesign === DESIGNS.MINIMAL 
+                  ? "bg-neutral-100" 
+                  : "bg-brand-gray"
+              )}>
+                <div className={cn(
+                  "p-4 mb-4",
+                  currentDesign === DESIGNS.MODERN 
+                    ? "bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 rounded-2xl text-white" 
+                    : currentDesign === DESIGNS.MINIMAL 
+                    ? "bg-black text-white" 
+                    : "bg-brand-navy rounded-lg text-white"
+                )}>
+                  <span className="font-bold">En-tête exemple</span>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className={cn(
+                    "p-4 text-center",
+                    currentDesign === DESIGNS.MODERN 
+                      ? "bg-white/80 backdrop-blur-sm rounded-2xl border border-purple-200/50" 
+                      : currentDesign === DESIGNS.MINIMAL 
+                      ? "bg-white border-2 border-neutral-200" 
+                      : "bg-white rounded-xl border border-slate-200"
+                  )}>
+                    <div className={cn(
+                      "w-8 h-8 mx-auto mb-2",
+                      currentDesign === DESIGNS.MODERN ? "bg-purple-100 rounded-xl" :
+                      currentDesign === DESIGNS.MINIMAL ? "bg-neutral-100" : "bg-brand-orange/10 rounded-lg"
+                    )} />
+                    <span className="text-xs">Produit</span>
+                  </div>
+                  <div className={cn(
+                    "p-4 text-center",
+                    currentDesign === DESIGNS.MODERN 
+                      ? "bg-white/80 backdrop-blur-sm rounded-2xl border border-purple-200/50" 
+                      : currentDesign === DESIGNS.MINIMAL 
+                      ? "bg-white border-2 border-neutral-200" 
+                      : "bg-white rounded-xl border border-slate-200"
+                  )}>
+                    <div className={cn(
+                      "w-8 h-8 mx-auto mb-2",
+                      currentDesign === DESIGNS.MODERN ? "bg-purple-100 rounded-xl" :
+                      currentDesign === DESIGNS.MINIMAL ? "bg-neutral-100" : "bg-brand-orange/10 rounded-lg"
+                    )} />
+                    <span className="text-xs">Produit</span>
+                  </div>
+                  <Button className={cn(
+                    "h-auto py-3",
+                    currentDesign === DESIGNS.MODERN 
+                      ? "bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl" 
+                      : currentDesign === DESIGNS.MINIMAL 
+                      ? "bg-black rounded-none" 
+                      : "bg-brand-orange"
+                  )}>
+                    Payer
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         </TabsContent>
 
